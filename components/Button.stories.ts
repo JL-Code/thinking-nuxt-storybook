@@ -15,6 +15,7 @@ export const Default: Story = {
     args: {
         label: 'Button',
         size: 'medium',
+        type:'primary'
     },
 }   
 
@@ -22,5 +23,6 @@ export const Large: Story = {
     args: {
         label: 'Large Button',
         size: 'large',
+        type:'success'
     },
 }

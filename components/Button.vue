@@ -1,12 +1,12 @@
 <template>
-    <button :class="buttonVariants({size})" >
-        <template v-if="label">
-            {{ label }}
-        </template>
-        <template v-else>
-            <slot />
-        </template>
-    </button>
+  <button :class="buttonVariants({ size })">
+    <template v-if="label">
+      {{ label }}
+    </template>
+    <template v-else>
+      <slot />
+    </template>
+  </button>
 </template>
 
 <script setup lang="ts">
@@ -17,6 +17,10 @@ withDefaults(defineProps<{
      * 按钮标签
      */
     label: string;
+    /**
+     * 按钮类型
+     */
+    type:'primary'|'success'|'warning'|'error'|'info',
     /**
      * 按钮大小
      */
@@ -30,14 +34,13 @@ const buttonVariants = cva(
     'bg-blue-500 text-white p-2 rounded-md',
     {
         variants: {
-            size: { 
-                small: 'p-2 text-xs',
-                medium: 'p-4 text-sm',
-                large: 'p-6 text-lg',
+            size: {
+                small: 'text-xs',
+                medium: 'text-sm',
+                large: 'text-lg',
             },
         },
     },
 )
 type ButtonProps = VariantProps<typeof buttonVariants>;
-
 </script>
