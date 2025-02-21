@@ -1,7 +1,12 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   devtools: { enabled: true },
-  modules: ["@nuxt/ui", "@nuxtjs/storybook"],
+  modules: [
+    "@nuxt/ui",
+    "@nuxtjs/storybook",
+    "@element-plus/nuxt",
+    "@vueuse/nuxt",
+  ],
 
   storybook: {
     port: 6006,
