@@ -20,7 +20,7 @@
 
       <Button label="Custom Button" size="large" type="success" />
 
-      <GamePicker :data="games" />
+      <GamePicker :data="games" :game-id="1" debug />
     </UCard>
   </UContainer>
 </template>
@@ -30,25 +30,13 @@ const games = ref<GamePicker.TreeNodeVO[]>([
   {
     id: 1,
     parentId: 0,
-    name: "Game 1",
+    name: "魔兽世界美服",
     type: "game",
-    typeName: "Game",
+    typeName: "游戏",
     hot: true,
     initial: "G",
     sort: 1,
-    children: [
-      {
-        id: 11,
-        parentId: 1,
-        name: "Game 1-1",
-        type: "game",
-        typeName: "Game",
-        hot: true,
-        initial: "G",
-        sort: 1,
-        children: [],
-      },
-    ],
+    children: [],
   },
 ]);
 </script>

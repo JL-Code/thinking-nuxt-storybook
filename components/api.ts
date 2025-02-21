@@ -16,7 +16,25 @@ export async function listGameAsTree() {
  */
 export async function listServerAsTreeByGameId(gameId: number) {
   return Promise.resolve({
-    data: [],
+    data: [ {
+      id: 1,
+      parentId: 1,
+      name: "欧区",
+      type: "region",
+      typeName: "大区",
+      hot: true,
+      initial: "E",
+      sort: 1,
+      children: [{
+        id: 11,
+        parentId: 1,
+        name: "欧服",
+        type: "server",
+        typeName: "服务器",
+        hot: true,
+        initial: "E",
+      }],
+    }],
     error: null,
   }); 
 }

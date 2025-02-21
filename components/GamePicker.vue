@@ -7,6 +7,9 @@
         <p>[state] gameId: {{ gameId }}</p>
         <p>[state] currentType: {{ currentType }}</p>
         <p>[state] selected: {{ selected }}</p>
+        <p>[state] games: {{ games }}</p>
+        <p>[state] servers: {{ servers }}</p>
+        <p>[state] nodes: {{ nodes }}</p>
         <p>[model] model: {{ model }}</p>
         <p>[computed] types: {{ types }}</p>
         <!-- <p>
@@ -30,16 +33,6 @@
         />
       </div>
     </div>
-    <!-- <el-form inline>
-        <el-form-item v-for="step in steps" :prop="step.type">
-          <el-input
-            :model-value="step.label"
-            :placeholder="`请选择${step.typeName}`"
-            :suffix-icon="ArrowDown"
-            @click="handleInputClick(step.type)"
-          />
-        </el-form-item>
-      </el-form> -->
     <!-- 内容面板分组 -->
     <div class="game-panel-group drop-shadow mt-1 absolute z-9999">
       <!-- 面板组件 -->
@@ -116,7 +109,7 @@ const whiteListNames = {
 
 /**
  * 组件选择完成
- *     // isCompleted 需要判断同一个路径上的数据是否加载完毕
+ * isCompleted 需要判断同一个路径上的数据是否加载完毕
  */
 const isCompleted = computed(() => {
   return types.value.length > 1 && types.value.length === selected.value.length;
@@ -170,21 +163,26 @@ const currentItem = computed((): GamePicker.OptionVM[] => {
 watch(
   () => props.data,
   async (val) => {
+    console.log("[game picker] watch data value", val);
     if (val) {
       nodes.value = [...val];
+      games.value = [...val];
     }
-  }
+  },
+  { immediate: true, deep:true }
 );
 
 watch(
   () => gameId.value,
   async (val: number | undefined) => {
+    console.log("[game picker] watch gameId value", val);
     if (val) {
       await loadServer(val);
     } else {
       clean("server");
     }
-  }
+  },
+  { immediate: true }
 );
 
 watch(
