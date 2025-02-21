@@ -8,3 +8,17 @@ interface KV<V> {
 interface AnyObj {
   [key: string]: any;
 }
+
+/**
+ * 默认 async/await 返回类型
+ */
+interface PromiseReturnType<T> {
+  /**
+   * 成功时返回的数据
+   */
+  data: T | null;
+  /**
+   * 失败时返回的错误
+   */
+  error: ApiProblem | null;
+}

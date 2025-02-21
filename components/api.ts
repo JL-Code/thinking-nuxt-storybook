@@ -1,12 +1,30 @@
+const mock = false;
+const apiBase = "http://test.bijiaqi.com";
+
 /**
  * 获取游戏树
  * @returns 游戏树
  */
 export async function listGameAsTree() {
-  return Promise.resolve({
-    data: [],
-    error: null,
-  });
+  if (mock) {
+    return Promise.resolve<PromiseReturnType<GamePicker.TreeNodeVO[]>>({
+      data: [],
+      error: null,
+    });
+  } else {
+    const list = await $fetch<GamePicker.TreeNodeVO[]>(
+      `${apiBase}/api/v1/any/shop/home/games`,
+      {
+        method: "POST",
+        body: {},
+      }
+    );
+
+    return Promise.resolve<PromiseReturnType<GamePicker.TreeNodeVO[]>>({
+      data: list,
+      error: null,
+    });
+  }
 }
 
 /**
@@ -15,26 +33,46 @@ export async function listGameAsTree() {
  * @returns 服务器树
  */
 export async function listServerAsTreeByGameId(gameId: number) {
-  return Promise.resolve({
-    data: [ {
-      id: 1,
-      parentId: 1,
-      name: "欧区",
-      type: "region",
-      typeName: "大区",
-      hot: true,
-      initial: "E",
-      sort: 1,
-      children: [{
-        id: 11,
-        parentId: 1,
-        name: "欧服",
-        type: "server",
-        typeName: "服务器",
-        hot: true,
-        initial: "E",
-      }],
-    }],
-    error: null,
-  }); 
+  if (mock) {
+    return Promise.resolve<PromiseReturnType<GamePicker.TreeNodeVO[]>>({
+      data: [
+        {
+          id: 1,
+          parentId: 1,
+          name: "欧区",
+          type: "region",
+          typeName: "大区",
+          hot: true,
+          initial: "E",
+          sort: 1,
+          children: [
+            {
+              id: 11,
+              parentId: 1,
+              name: "欧服",
+              type: "server",
+              typeName: "服务器",
+              hot: true,
+              initial: "E",
+            },
+          ],
+        },
+      ],
+      error: null,
+    });
+  } else {
+    const list = await $fetch<GamePicker.TreeNodeVO[]>(
+      `${apiBase}/api/v1/any/shop/home/servers/`,
+      {
+        method: "POST",
+        body: {
+          gameId: 332,
+        },
+      }
+    );
+    return Promise.resolve<PromiseReturnType<GamePicker.TreeNodeVO[]>>({
+      data: list,
+      error: null,
+    });
+  }
 }
