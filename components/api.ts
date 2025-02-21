@@ -54,6 +54,7 @@ export async function listServerAsTreeByGameId(gameId: number) {
               typeName: "服务器",
               hot: true,
               initial: "E",
+              sort: 1,
             },
           ],
         },
@@ -62,7 +63,7 @@ export async function listServerAsTreeByGameId(gameId: number) {
     });
   } else {
     const list = await $fetch<GamePicker.TreeNodeVO[]>(
-      `${apiBase}/api/v1/any/shop/home/servers/`,
+      `${apiBase}/api/v1/any/shop/home/servers`,
       {
         method: "POST",
         body: {

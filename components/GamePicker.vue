@@ -8,8 +8,6 @@
         <p>[state] currentType: {{ currentType }}</p>
         <p>[state] selected: {{ selected }}</p>
         <p>[state] games: {{ games }}</p>
-        <p>[state] servers: {{ servers }}</p>
-        <p>[state] nodes: {{ nodes }}</p>
         <p>[model] model: {{ model }}</p>
         <p>[computed] types: {{ types }}</p>
         <!-- <p>

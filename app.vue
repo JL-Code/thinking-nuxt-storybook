@@ -20,7 +20,7 @@
 
       <Button label="Custom Button" size="large" type="success" />
 
-      <GamePicker :data="games" :game-id="1" debug />
+      <GamePicker debug />
     </UCard>
   </UContainer>
 </template>
