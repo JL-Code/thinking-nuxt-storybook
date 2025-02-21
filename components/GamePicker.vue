@@ -7,13 +7,12 @@
         <p>[state] gameId: {{ gameId }}</p>
         <p>[state] currentType: {{ currentType }}</p>
         <p>[state] selected: {{ selected }}</p>
-        <p>[state] games: {{ games }}</p>
         <p>[model] model: {{ model }}</p>
         <p>[computed] types: {{ types }}</p>
         <!-- <p>
-            [computed] currentGame: {{ currentGame?.label }} -
-            {{ currentGame?.value }}
-          </p> -->
+          [computed] currentGame: {{ currentGame?.label }} -
+          {{ currentGame?.value }}
+        </p> -->
         <!-- <p>[computed] selected path: {{ selectedPath }}</p> -->
         <p>[computed] isCompleted: {{ isCompleted }}</p>
         <!-- <p>[computed] currentData:{{ currentData }}</p> -->
@@ -21,15 +20,30 @@
     </div>
     <!-- 输入框区 -->
     <div class="flex gap-x-2">
-      <div v-for="item in steps" :key="item.type">
-        <el-input
-          :readonly="isGameLoading"
-          :model-value="item.label"
-          :placeholder="`请选择${item.typeName}`"
-          :suffix-icon="ArrowDown"
+      <template v-if="steps.length">
+        <div
+          v-for="item in steps"
+          :key="item.type"
+          :class="{
+            'border-primary': item.type === currentType,
+          }"
+          class=" cursor-pointer w-xs flex items-center h-8 border bg-white px-3 py-1 rounded-md"
           @click="handleInputClick(item.type)"
-        />
-      </div>
+        >
+          <div class="flex-1 text-sm">
+            <div v-if="item.label">{{ item.label }}</div>
+            <div v-else class="text-info">{{ `请选择${item.typeName}` }}</div>
+          </div>
+          <ElIcon color="#9ca3af">
+            <Search />
+          </ElIcon>
+        </div>
+      </template>
+      <ElSkeleton v-else animated>
+        <template #template>
+          <ElSkeletonItem />
+        </template>
+      </ElSkeleton>
     </div>
     <!-- 内容面板分组 -->
     <div class="game-panel-group drop-shadow mt-1 absolute z-9999">
@@ -50,17 +64,21 @@
 // ssr 时数据由调用者传入
 // 非 ssr 时数据由组件内部调用
 import _ from "lodash";
-import { ArrowDown } from "@element-plus/icons-vue";
+import { Search } from "@element-plus/icons-vue";
 import { listGameAsTree, listServerAsTreeByGameId } from "./api";
 interface Props {
   /**
-   * 调试模型，默认 false
+   * 调试模式
    */
   debug?: boolean;
   /**
-   * url 参数联动，默认 false
+   * URL参数联动
    */
   urlLinkage?: boolean;
+  /**
+   * 默认游戏
+   */
+  defaultGame?: number;
   /**
    * 游戏数据
    */
@@ -70,10 +88,12 @@ const props = withDefaults(defineProps<Props>(), {
   debug: false,
   urlLinkage: false,
   data: () => [],
+  defaultGame: undefined,
 });
 const emit = defineEmits<{
-  change: [val: KV<number>[], old?: KV<number>[]];
+  change: [val: KV<number>[], old?: KV<number>[],server?:string];
   itemClick: [type: string, item: any];
+  select: [GamePicker.SimpleOptionVM[]]
 }>();
 
 // TODO: ssr 开启时，主要主动应用 apiBase，openapi.client.ts 还未初始化好
@@ -99,10 +119,10 @@ const selected = ref<GamePicker.SimpleOptionVM[]>([]);
 const currentType = ref<string>("");
 const whiteList = ["game", "region", "server"];
 const whiteListNames = {
-  game:"游戏",
-  region:"地区",
-  server:"服务器"
-}
+  game: "游戏",
+  region: "地区",
+  server: "服务器",
+};
 /** =================组件计算属性=================== */
 
 /**
@@ -156,40 +176,50 @@ const currentItem = computed((): GamePicker.OptionVM[] => {
   });
 });
 
+const selectedServer = computed(() => {
+  return selected.value.filter(m => m.type !== 'game').map(m => m.label).join('/')
+})
+
+
 /** =================组件监听器=================== */
 
 watch(
   () => props.data,
   async (val) => {
-    console.log("[game picker] watch data value", val);
     if (val) {
       nodes.value = [...val];
-      games.value = [...val];
     }
-  },
-  { immediate: true, deep:true }
+  }
 );
 
 watch(
-  () => gameId.value,
-  async (val: number | undefined) => {
-    console.log("[game picker] watch gameId value", val);
+  () => props.defaultGame,
+  async (val) => {
     if (val) {
-      await loadServer(val);
-    } else {
-      clean("server");
+      await setDefaultGame(val);
     }
   },
   { immediate: true }
 );
 
 watch(
+  () => gameId.value,
+  async (val: number | undefined) => {
+    if (val) {
+      await loadServer(val);
+    } else {
+      clean("server");
+    }
+  }
+);
+
+watch(
   () => model.value,
   async (val: KV<number>[], old?: KV<number>[]) => {
-    console.log("[game picker] watch model value", val, old);
+    console.debug("[game picker] watch model value", val, old);
     if (JSON.stringify(val) !== JSON.stringify(old)) {
       setDefaultValue(val);
-      emit("change", val, old);
+      emit("change", val, old,selectedServer.value);
     }
   }
 );
@@ -208,7 +238,7 @@ defineExpose({
  * @param type 数据项类型
  */
 const handleInputClick = (type: string) => {
-  console.log("[game-picker] 选中", type);
+  console.debug("[game-picker] 选中", type);
   setCurrentType(type);
 };
 
@@ -225,7 +255,7 @@ const handleItemClick = async (
     // 动态设置 url 参数
     Urls.addParam(type, String(item.value));
   }
-  console.log("[game-picker] handleItemClick", type, item);
+  console.debug("[game-picker] handleItemClick", type, item);
   if (type === "game") {
     gameId.value = item.value;
     // 重新加载服务器数据
@@ -248,14 +278,14 @@ const handlePanelClose = () => {
 function setDefaultValueWithQuery() {
   const params = Urls.readParams(window.location.href);
   const obj = Object.fromEntries(params.entries());
-  console.log("obj", obj);
+  console.debug("obj", obj);
 
   const kv: KV<number>[] = Array.from(params.entries()).map(([key, value]) => ({
     key,
     value,
   })) as any;
 
-  console.log("kv", kv);
+  console.debug("kv", kv);
 
   setDefaultValue(kv);
 }
@@ -296,7 +326,7 @@ async function setDefaultValue(params?: KV<number>[]) {
             break;
           }
           await loadServer(_gameId);
-          console.log("[game] 服务器加载完毕", _gameId, Date.now());
+          console.debug("[game] 服务器加载完毕", _gameId, Date.now());
           break;
       }
     }
@@ -305,7 +335,7 @@ async function setDefaultValue(params?: KV<number>[]) {
       (m) => m.type == param.key && m.id == param.value
     );
     if (_node) {
-      console.log(`[game picker] 设置默认值 type: ${param.key}`, param.value);
+      console.debug(`[game picker] 设置默认值 type: ${param.key}`, param.value);
       selectedItem(param.key, {
         typeName: "",
         options: [],
@@ -324,12 +354,12 @@ async function setDefaultValue(params?: KV<number>[]) {
  * @param params 商品定位参数
  */
 function attemptAddType(params: KV<number>[]) {
-  if(types.value.length===0){
-    return
+  if (types.value.length === 0) {
+    return;
   }
   for (let i = 0; i < params.length; i++) {
     const element = params[i];
-    if(!whiteList.includes(element.key)){
+    if (!whiteList.includes(element.key)) {
       element.key = types.value[i];
     }
   }
@@ -358,7 +388,7 @@ async function setDefaultGame(gameId: number) {
       params.push({ key: type, value: node.id });
     }
   }
-  console.log("[game] setDefaultGame", params);
+  console.debug("[game] setDefaultGame", params);
   await setDefaultValue(params);
 }
 
@@ -447,7 +477,9 @@ function selectedItem(type: string, item: GamePicker.OptionVM) {
     gameId.value = item.value;
   }
   //
-  model.value = selected.value.map((m) => ({ key: m.type, value: m.value! }));
+  model.value = selected.value.map((m) => ({ key: m.type, value: m.value!, label: m.label }));
+  // 触发选择事件
+  emit("select", selected.value);
 }
 
 /** =================辅助函数=================== */
@@ -457,7 +489,7 @@ async function loadData(loadSuccess?: GamePicker.LoadSuccessFn) {
     console.error("[game picker] loadData", error);
   }
   if (data) {
-    const formated = formatDate(data);
+    const formated = formatDate(data, "game");
     games.value = [...formated];
     nodes.value = [...formated];
     if (loadSuccess) {
@@ -483,7 +515,7 @@ async function loadServer(
   }
   const list = Trees.flatten(data as any) as GamePicker.TreeNodeVO[];
   types.value = ["game", ...extractUniqueTypes(list as any)];
-  const formated = formatDate(list);
+  const formated = formatDate(list, "server");
   nodes.value = [...games.value, ...formated];
   servers.value = [...formated];
   if (loadSuccess) {
@@ -495,7 +527,7 @@ async function loadServer(
  * 格式化数据
  * @param nodes 节点数据
  */
-function formatDate(nodes: GamePicker.TreeNodeVO[]): GamePicker.TreeNodeVO[] {
+function formatDate(nodes: GamePicker.TreeNodeVO[], type: string): GamePicker.TreeNodeVO[] {
   const formated = nodes.map((n) => {
     return {
       id: n.id!,
@@ -509,7 +541,11 @@ function formatDate(nodes: GamePicker.TreeNodeVO[]): GamePicker.TreeNodeVO[] {
       children: n.children as GamePicker.TreeNodeVO[],
     };
   });
-  return _.sortBy(formated, "sort");
+  if (type == 'game') {
+    return _.sortBy(formated, "sort");
+  } else {
+    return _.sortBy(formated, "name");
+  }
 }
 
 function extractUniqueTypes(data: GamePicker.TreeNodeVO[]): string[] {
@@ -520,6 +556,7 @@ onMounted(async () => {
   if (props.data.length === 0) {
     await loadRemoteData();
   }
+  setDefaultValueWithQuery();
 });
 
 async function loadRemoteData() {
