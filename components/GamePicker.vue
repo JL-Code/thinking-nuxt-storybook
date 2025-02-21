@@ -7,6 +7,8 @@
         <p>[state] gameId: {{ gameId }}</p>
         <p>[state] currentType: {{ currentType }}</p>
         <p>[state] selected: {{ selected }}</p>
+        <p>[state] servers length: {{ servers.length }}</p>
+        <p>[state] nodes length: {{ nodes.length }}</p>
         <p>[model] model: {{ model }}</p>
         <p>[computed] types: {{ types }}</p>
         <!-- <p>
@@ -27,10 +29,10 @@
           :class="{
             'border-primary': item.type === currentType,
           }"
-          class=" cursor-pointer w-xs flex items-center h-8 border bg-white px-3 py-1 rounded-md"
+          class="cursor-pointer w-full flex items-center h-8 border bg-white px-3 py-1 rounded-md"
           @click="handleInputClick(item.type)"
         >
-          <div class="flex-1 text-sm">
+          <div class="flex-1 text-sm pr-2">
             <div v-if="item.label">{{ item.label }}</div>
             <div v-else class="text-info">{{ `请选择${item.typeName}` }}</div>
           </div>
@@ -54,6 +56,7 @@
         :data="currentItem"
         :type="currentType"
         @item-click="handleItemClick"
+        @recently-visited-click="handleRecentlyVisitedClick"
         @close="handlePanelClose"
       />
     </div>
@@ -206,6 +209,7 @@ watch(
   () => gameId.value,
   async (val: number | undefined) => {
     if (val) {
+      console.log("[game picker] watch gameId value", val);
       await loadServer(val);
     } else {
       clean("server");
@@ -251,6 +255,7 @@ const handleItemClick = async (
   type: string,
   item: GamePicker.SimpleOptionVM
 ) => {
+  console.log("handleItemClick",type,item)
   if (props.urlLinkage) {
     // 动态设置 url 参数
     Urls.addParam(type, String(item.value));
@@ -267,6 +272,20 @@ const handleItemClick = async (
 
   emit("itemClick", type, item);
 };
+
+const handleRecentlyVisitedClick = async (gameId:number)=>{
+  clean('server');
+  currentType.value = "game";
+  var gameItem = games.value.find(m=>m.id===gameId)||{} as GamePicker.TreeNodeVO;
+  await handleItemClick('game',{
+      label:gameItem.name,
+      value:gameItem.id,
+      initial:gameItem.initial,
+      hot:gameItem.hot,
+      type:'game',
+      typeName:'游戏'
+  });
+}
 
 const handlePanelClose = () => {
   closePanel();
@@ -380,7 +399,6 @@ async function setDefaultGame(gameId: number) {
     await loadData();
   }
   params.push({ key: "game", value: gameId });
-  // 加载服务器信息
   await loadServer(gameId);
   for (const type of types.value) {
     const node = servers.value.filter((m) => m.type === type)[0];
@@ -428,18 +446,18 @@ function closePanel() {
  */
 function moveToNextType() {
   const index = types.value.findIndex((m) => m == currentType.value);
-  console.debug(
+  console.info(
     "[game] moveToNextType",
     currentType.value,
     index,
     types.value.length
   );
   if (index + 1 >= types.value.length) {
-    console.debug("[game] 已经是最后一个类型了");
+    console.info("[game] 已经是最后一个类型了");
     setCurrentType("");
   } else {
     const nextType = types.value[index + 1];
-    console.debug("[game] nextType", nextType);
+    console.info("[game] nextType", nextType);
     setCurrentType(nextType);
   }
 }
@@ -562,6 +580,7 @@ onMounted(async () => {
 async function loadRemoteData() {
   await loadData(async (data) => {
     const game = data[0];
+    console.log("[game picker] loadRemoteData", game.id);
     await loadServer(game.id);
   });
 }

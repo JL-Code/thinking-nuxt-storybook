@@ -2,28 +2,39 @@
   <!-- 内容面板 -->
   <el-card shadow="never" class="min-w-4xl">
     <template #header>
+      <div class="flex items-center gap-x-2">
+        <el-text type="info">最近选择：</el-text>
+        <div class="flex gap-x-2">
+          <p
+            @click="handleRecentlyVisitedClick(331)"
+            class="cursor-pointer line-clamp-1 hover:underline text-sm"
+          >
+            魔兽世界美服
+          </p>
+        </div>
+      </div>
       <!-- 关键字搜索 -->
       <div class="flex justify-between items-center pt-3 gap-x-2">
-        <div class="flex">
+        <div class="flex items-center gap-x-2">
           <div>
             <el-input
               v-model="keyword"
               :suffix-icon="Search"
-              placeholder="请输入关键字" />
+              placeholder="请输入关键字"
+            />
           </div>
           <div>
             <el-link
               type="primary"
-              text
-              to="tencent://message/?uin=3007797691&Site=比价器BiJiaQi.com&Menu=yes">没有您要的游戏？
+              href="tencent://message/?uin=3007797691&Site=比价器BiJiaQi.com&Menu=yes"
+            >
+              没有您要的游戏？
             </el-link>
           </div>
         </div>
         <div>
-          <el-button
-            size="small"
-            type="danger"
-            @click="$emit('close')">关闭
+          <el-button size="small" type="danger" @click="$emit('close')"
+            >关闭
           </el-button>
         </div>
       </div>
@@ -39,15 +50,13 @@
           v-for="item in filteredData"
           :key="item.value"
           :title="item.label"
-          class="w-40 text-xs cursor-pointer line-clamp-1 hover:underline hover:text-blue line-height-relaxed"
-          @click="handleClick(item)">
+          class="w-40 text-xs cursor-pointer line-clamp-1 hover:underline"
+          @click="handleItemClick(item)"
+        >
           {{ item.label }}
         </div>
       </div>
-      <el-empty
-        v-else
-        class="mx-auto"
-        :image-size="100" />
+      <el-empty v-else class="mx-auto" :image-size="100" />
     </el-scrollbar>
   </el-card>
 </template>
@@ -71,6 +80,7 @@ const rootProps = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   close: [];
   itemClick: [type: string, item: GamePicker.SimpleOptionVM];
+  recentlyVisitedClick: [gameId: number];
 }>();
 
 const ALL = "全部"
@@ -129,9 +139,17 @@ const filteredData = computed(() => {
 const cleanKeyword = ()=>{
 keyword.value= ""
 }
+const resetLetter = ()=>{
+letter.value= ALL
+}
 
-const handleClick = (item: GamePicker.SimpleOptionVM) => {
+const handleItemClick = (item: GamePicker.SimpleOptionVM) => {
   cleanKeyword();
+  resetLetter();
   emit("itemClick", rootProps.type, item);
 };
+
+const handleRecentlyVisitedClick = (gameId:number)=>{
+  emit('recentlyVisitedClick',gameId)
+}
 </script>

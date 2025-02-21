@@ -67,7 +67,7 @@ export async function listServerAsTreeByGameId(gameId: number) {
       {
         method: "POST",
         body: {
-          gameId: 332,
+          gameId: gameId,
         },
       }
     );
