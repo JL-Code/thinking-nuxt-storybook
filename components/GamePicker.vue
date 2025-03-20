@@ -25,8 +25,15 @@
     <div class="flex w-full gap-x-2">
       <template v-if="steps.length">
         <div v-for="item in steps" class="w-full">
-          <el-input :key="item.type" :placeholder="`请选择${item.typeName}`" @click="handleInputClick(item.type)"
-            class="game-picker-input" readonly :model-value="item.label" :suffix-icon="Search" />
+          <el-input
+            :key="item.type"
+            :placeholder="`请选择${item.typeName}`"
+            @click="handleInputClick(item.type)"
+            class="game-picker-input"
+            readonly
+            :model-value="item.label"
+            :suffix-icon="Search"
+          />
         </div>
       </template>
       <ElSkeleton v-else animated>
@@ -40,8 +47,15 @@
     <!-- 内容面板分组 -->
     <div class="mt-1 absolute z-9999">
       <!-- 面板组件 -->
-      <GamePanel v-if="currentType" v-loading="isGameLoading || isServerLoading" :data="currentItem" :type="currentType"
-        @item-click="handleItemClick" @recently-visited-click="handleRecentlyVisitedClick" @close="handlePanelClose" />
+      <GamePanel
+        v-if="currentType"
+        v-loading="isGameLoading || isServerLoading"
+        :data="currentItem"
+        :type="currentType"
+        @item-click="handleItemClick"
+        @recently-visited-click="handleRecentlyVisitedClick"
+        @close="handlePanelClose"
+      />
     </div>
   </div>
   <!-- 游戏选择器组件E -->
@@ -62,10 +76,6 @@ interface Props {
    */
   urlLinkage?: boolean;
   /**
-   * 默认游戏
-   */
-  defaultGame?: number;
-  /**
    * 游戏数据
    */
   data?: GamePicker.TreeNodeVO[];
@@ -74,8 +84,7 @@ type NodeType = "game" | "region" | "server" | "camp";
 const props = withDefaults(defineProps<Props>(), {
   debug: false,
   urlLinkage: true,
-  data: () => [],
-  defaultGame: undefined,
+  data: () => []
 });
 const emit = defineEmits<{
   change: [val: KV<number>[], old?: KV<number>[], server?: string];
@@ -87,7 +96,7 @@ const emit = defineEmits<{
 /** =================组件状态=================== */
 
 const model = defineModel<KV<number>[]>({ default: [] });
-const gameId = defineModel<number>("gameId");
+const gameId = defineModel<number>("gameId",{required:false});
 const isGameLoading = ref(false);
 const isServerLoading = ref(false);
 const disabled = computed(() => {
@@ -185,29 +194,19 @@ watch(
 );
 
 watch(
-  () => props.defaultGame,
-  async (val) => {
-    if (val) {
-      await setDefaultGame(val);
+  () => gameId.value,
+  async (val: number | undefined, old?: number) => {
+    if (val && val !== old) {
+      _changeGame(val);
     }
-  },
-  { immediate: true }
+  }
 );
-
-// watch(
-//   () => gameId.value,
-//   async (val: number | undefined, old?: number) => {
-//     if (val !== old) {
-//       _changeGame(val || 0);
-//     }
-//   }
-// );
 
 watch(
   () => model.value,
   async (val: KV<number>[], old?: KV<number>[]) => {
-    const _valList = val.map(m => ({ value: Number(m.value) }));
-    const _oldList = old?.map(m => ({ value: Number(m.value) }));
+    const _valList = val.map(m => ({ key:m.key, value: Number(m.value) }));
+    const _oldList = old?.map(m => ({ key:m.key, value: Number(m.value) }));
     if (JSON.stringify(_valList) !== JSON.stringify(_oldList)) {
       _log("model change", _valList, _oldList);
       setDefaultValue(val);
@@ -228,7 +227,7 @@ const handleInputClick = (type: string) => {
     return;
   }
   console.debug("[game-picker] 选中", type);
-  setCurrentType(type);
+  _setCurrentType(type);
 };
 
 /**
@@ -277,7 +276,7 @@ const handlePanelClose = () => {
  * 从 URL 参数中设置默认值
  */
 function setDefaultValueWithQuery() {
-  console.debug("setDefaultValueWithQuery");
+  _log("setDefaultValueWithQuery start");
   const params = Urls.readParams(window.location.href);
   const kv: KV<number>[] = Array.from(params.entries()).map(([key, value]) => ({
     key,
@@ -373,7 +372,6 @@ async function setDefaultValue(params?: KV<number>[]) {
 
   // case 1.3 & 2.3: 循环遍历传入的参数,设置默认值
   for (const param of params) {
-    _log("循环遍历传入的参数", param);
     const node = nodes.value.find(m => m.type === param.key && m.id === Number(param.value));
     if (!node) {
       // 如果是第一个参数且不存在,退出整个方法
@@ -421,19 +419,19 @@ function attemptAddType(params: KV<number>[]) {
  */
 function moveToNextType() {
   const index = types.value.findIndex((m) => m == currentType.value);
-  console.info(
-    "[game-picker] moveToNextType",
+  _log(
+    "moveToNextType",
     currentType.value,
     index,
     types.value.length
   );
   if (index + 1 >= types.value.length) {
-    console.info("[game-picker] 已经是最后一个类型了");
-    setCurrentType("");
+    _log("已经是最后一个类型了");
+    _setCurrentType("");
   } else {
     const nextType = types.value[index + 1];
-    console.info("[game-picker] nextType", nextType);
-    setCurrentType(nextType);
+    _log("nextType", nextType);
+    _setCurrentType(nextType);
   }
 }
 
@@ -445,7 +443,6 @@ function moveToNextType() {
  * @param item 选中项
  */
 function selectedItem(type: string, item: GamePicker.OptionVM) {
-  console.debug("[game] selected item", type, item);
   const index = selected.value.findIndex((m) => m.type === type);
   if (index >= 0) {
     const delStart = index + 1;
@@ -518,11 +515,11 @@ async function setDefaultGame(gameId: number) {
  */
 function clean(type: "game" | "server") {
   if (type == "game") {
-    console.info("[game-picker] clean game");
+    _log("clean game");
     games.value.length = 0;
   }
   if (type == "server") {
-    console.info("[game-picker] clean server");
+    _log("clean server");
     servers.value.length = 0;
   }
 }
@@ -531,8 +528,7 @@ function clean(type: "game" | "server") {
  * 设置当前选项类型
  * @param type 选项类型
  */
-function setCurrentType(type: string) {
-  console.debug("[game] type change", type);
+function _setCurrentType(type: string) {
   currentType.value = type;
 }
 
@@ -540,7 +536,7 @@ function setCurrentType(type: string) {
  * 关闭面板
  */
 function closePanel() {
-  setCurrentType("");
+  _setCurrentType("");
 }
 
 /**
@@ -548,6 +544,7 @@ function closePanel() {
  */
 function _resetState() {
   selected.value = [];
+  gameId.value = undefined;
   Urls.removeParam("game");
   Urls.removeParam("region");
   Urls.removeParam("server");
@@ -659,7 +656,10 @@ function _unReactive(val: any) {
  * @param args 日志内容
  */
 function _log(...args: any[]) {
-  console.info(...['%c[game picker]', 'color: green;', ...args]);
+  const fixedPrefix = [`%cGamePicker %c`,
+      "color: black; border-radius: 3px 0 0 3px; padding: 2px 2px 1px 10px; background: #00DC82",
+      "border-radius: 0 3px 3px 0; padding: 2px 10px 1px 2px; background: #00DC8220"];
+  console.info(...[...fixedPrefix, ...args]);
 }
 
 /**
