@@ -136,16 +136,16 @@ const filteredData = computed(() => {
 })
 
 const cleanKeyword = () => {
-  console.warn("[game-panel] cleanKeyword", keyword.value)
+  _log("cleanKeyword", keyword.value)
   keyword.value = ""
 }
 const resetLetter = () => {
-  console.warn("[game-panel] resetLetter", letter.value)
+  _log("resetLetter", letter.value)
   letter.value = ALL
 }
 
 const handleItemClick = (item: GamePicker.SimpleOptionVM) => {
-  console.warn("[game-panel] handleItemClick", item)
+  _log("handleItemClick", item)
   cleanKeyword();
   resetLetter();
   if (rootProps.type === "game") {
@@ -161,7 +161,7 @@ const handleItemClick = (item: GamePicker.SimpleOptionVM) => {
  */
 
 const handleRecentlyVisitedClick = (gameId: number) => {
-  console.warn("[game-panel] handleRecentlyVisitedClick", gameId)
+  _log("handleRecentlyVisitedClick", gameId)
   cleanKeyword();
   resetLetter();
   emit('recentlyVisitedClick', gameId)
@@ -180,6 +180,14 @@ const saveRecentlyVisited = (item: GamePicker.SimpleOptionVM) => {
   }
   recentlyVisited.value.push(item)
   localStorage.setItem('recentlyVisited', JSON.stringify(recentlyVisited.value))
+}
+
+/**
+ * 打印日志
+ * @param args 日志内容
+ */
+function _log(...args: any[]) {
+  console.info(...['%c[game panel]', 'color: green;', ...args]);
 }
 
 onMounted(() => {

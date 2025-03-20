@@ -10,11 +10,17 @@
         <NuxtLink to="/">返回首页</NuxtLink>
         <ElButton @click="resetState">重置选择器</ElButton>
       </div>
+
       <div class="mt-2 flex flex-wrap gap-2">
+        <h1>手动设置选中值</h1>
         游戏id：
-        <ElInput v-model="gameId" />
+        <ElSelect v-model="gameId" placeholder="请选择游戏">
+          <ElOption v-for="item in gameIds" :key="item" :label="item" :value="item" />
+        </ElSelect>
         服务器索引：
-        <ElInput v-model="serverIndex" />
+        <ElSelect v-model="serverIndex" placeholder="请选择服务器">
+          <ElOption v-for="item in serverIndexs" :key="item" :label="item" :value="item" />
+        </ElSelect>
         <ElButton @click="setGameIdAndServerIndex(gameId, serverIndex)">设置选中值</ElButton>
       </div>
     </UCard>
@@ -23,8 +29,12 @@
 
 
 <script setup lang="ts">
+// 334 332
+const gameIds = ref<number[]>([334, 332]);
 const gameId = ref<number>(332);
+// 24201 23966-24008
 const serverIndex = ref<string>("23966-24008");
+const serverIndexs = ref<string[]>(["24201", "23966-24008"]);
 const value = ref<KV<number>[]>([{
   key: "game",
   value: 332,
