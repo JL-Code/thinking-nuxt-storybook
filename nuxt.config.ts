@@ -6,6 +6,7 @@ export default defineNuxtConfig({
     "@nuxtjs/storybook",
     "@element-plus/nuxt",
     "@vueuse/nuxt",
+    "@unocss/nuxt",
   ],
 
   storybook: {

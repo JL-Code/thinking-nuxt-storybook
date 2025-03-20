@@ -1,0 +1,85 @@
+{
+    "userSearchGameList": [],
+    "hotSearchGameList": [
+        {
+            "gameId": "336",
+            "gameName": "暗黑四",
+            "categoryId": "1",
+            "categoryCode": "gold",
+            "categoryName": "金币",
+            "count": 4
+        },
+        {
+            "gameId": "332",
+            "gameName": "王权与自由",
+            "categoryId": "1",
+            "categoryCode": "gold",
+            "categoryName": "金币",
+            "count": 4
+        },
+        {
+            "gameId": "331",
+            "gameName": "魔兽60怀旧服(美服）",
+            "categoryId": "12",
+            "categoryCode": "boosting",
+            "categoryName": "代练",
+            "count": 3
+        },
+        {
+            "gameId": "332",
+            "gameName": "王权与自由",
+            "categoryId": "10",
+            "categoryCode": "item",
+            "categoryName": "装备",
+            "count": 2
+        },
+        {
+            "gameId": "332",
+            "gameName": "王权与自由",
+            "categoryId": "12",
+            "categoryCode": "boosting",
+            "categoryName": "代练",
+            "count": 2
+        },
+        {
+            "gameId": "333",
+            "gameName": "新世界",
+            "categoryId": "1",
+            "categoryCode": "gold",
+            "categoryName": "金币",
+            "count": 1
+        },
+        {
+            "gameId": "333",
+            "gameName": "新世界",
+            "categoryId": "12",
+            "categoryCode": "boosting",
+            "categoryName": "代练",
+            "count": 1
+        },
+        {
+            "gameId": "331",
+            "gameName": "魔兽60级怀旧服(美服）",
+            "categoryId": "11",
+            "categoryCode": "account",
+            "categoryName": "账号",
+            "count": 1
+        },
+        {
+            "gameId": "331",
+            "gameName": "魔兽60怀旧服(美服）",
+            "categoryId": "1",
+            "categoryCode": "gold",
+            "categoryName": "金币",
+            "count": 1
+        },
+        {
+            "gameId": "333",
+            "gameName": "新世界",
+            "categoryId": "11",
+            "categoryCode": "account",
+            "categoryName": "账号",
+            "count": 1
+        }
+    ]
+}

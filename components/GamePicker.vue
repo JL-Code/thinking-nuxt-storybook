@@ -1,6 +1,7 @@
 <template>
   <!-- 游戏选择器组件S -->
   <div class="relative">
+    <!-- 调试信息 -->
     <div v-if="debug">
       <el-card>
         <p>[state] isGameLoading: {{ isGameLoading }}</p>
@@ -20,25 +21,13 @@
         <!-- <p>[computed] currentData:{{ currentData }}</p> -->
       </el-card>
     </div>
-    <!-- 输入框区 -->
-    <div class="flex gap-x-2">
+    <!-- 选择器1 -->
+    <div class="flex w-full gap-x-2">
       <template v-if="steps.length">
-        <div
-          v-for="item in steps"
-          :key="item.type"
-          :class="{
-            'border-primary': item.type === currentType,
-          }"
-          class="cursor-pointer w-full flex items-center h-8 border bg-white px-3 py-1 rounded-md"
-          @click="handleInputClick(item.type)"
-        >
-          <div class="flex-1 text-sm pr-2">
-            <div v-if="item.label">{{ item.label }}</div>
-            <div v-else class="text-info">{{ `请选择${item.typeName}` }}</div>
-          </div>
-          <ElIcon color="#9ca3af">
-            <Search />
-          </ElIcon>
+        <div v-for="item in steps" class="w-full">
+          <el-input :key="item.type" :placeholder="`请选择${item.typeName}`"
+            @click="handleInputClick(item.type)" class="game-picker-input" readonly :model-value="item.label"
+            :suffix-icon="Search" />
         </div>
       </template>
       <ElSkeleton v-else animated>
@@ -47,18 +36,13 @@
         </template>
       </ElSkeleton>
     </div>
+    <!-- 选择器2 -->
+     
     <!-- 内容面板分组 -->
-    <div class="game-panel-group drop-shadow mt-1 absolute z-9999">
+    <div class="mt-1 absolute z-9999">
       <!-- 面板组件 -->
-      <GamePanel
-        v-if="currentType"
-        v-loading="isGameLoading"
-        :data="currentItem"
-        :type="currentType"
-        @item-click="handleItemClick"
-        @recently-visited-click="handleRecentlyVisitedClick"
-        @close="handlePanelClose"
-      />
+      <GamePanel v-if="currentType" v-loading="isGameLoading" :data="currentItem" :type="currentType"
+        @item-click="handleItemClick" @recently-visited-click="handleRecentlyVisitedClick" @close="handlePanelClose" />
     </div>
   </div>
   <!-- 游戏选择器组件E -->
@@ -89,19 +73,17 @@ interface Props {
 }
 const props = withDefaults(defineProps<Props>(), {
   debug: false,
-  urlLinkage: false,
+  urlLinkage: true,
   data: () => [],
   defaultGame: undefined,
 });
 const emit = defineEmits<{
-  change: [val: KV<number>[], old?: KV<number>[],server?:string];
+  change: [val: KV<number>[], old?: KV<number>[], server?: string];
   itemClick: [type: string, item: any];
   select: [GamePicker.SimpleOptionVM[]]
 }>();
 
-// TODO: ssr 开启时，主要主动应用 apiBase，openapi.client.ts 还未初始化好
-const config = useRuntimeConfig();
-const apiBase = config.public.apiBase;
+
 /** =================组件状态=================== */
 
 const model = defineModel<KV<number>[]>({ default: [] });
@@ -223,7 +205,7 @@ watch(
     console.debug("[game picker] watch model value", val, old);
     if (JSON.stringify(val) !== JSON.stringify(old)) {
       setDefaultValue(val);
-      emit("change", val, old,selectedServer.value);
+      emit("change", val, old, selectedServer.value);
     }
   }
 );
@@ -255,12 +237,11 @@ const handleItemClick = async (
   type: string,
   item: GamePicker.SimpleOptionVM
 ) => {
-  console.log("handleItemClick",type,item)
+  console.warn("[game-picker] child handleItemClick", type, item)
   if (props.urlLinkage) {
     // 动态设置 url 参数
     Urls.addParam(type, String(item.value));
   }
-  console.debug("[game-picker] handleItemClick", type, item);
   if (type === "game") {
     gameId.value = item.value;
     // 重新加载服务器数据
@@ -273,17 +254,17 @@ const handleItemClick = async (
   emit("itemClick", type, item);
 };
 
-const handleRecentlyVisitedClick = async (gameId:number)=>{
+const handleRecentlyVisitedClick = async (gameId: number) => {
   clean('server');
   currentType.value = "game";
-  var gameItem = games.value.find(m=>m.id===gameId)||{} as GamePicker.TreeNodeVO;
-  await handleItemClick('game',{
-      label:gameItem.name,
-      value:gameItem.id,
-      initial:gameItem.initial,
-      hot:gameItem.hot,
-      type:'game',
-      typeName:'游戏'
+  var gameItem = games.value.find(m => m.id === gameId) || {} as GamePicker.TreeNodeVO;
+  await handleItemClick('game', {
+    label: gameItem.name,
+    value: gameItem.id,
+    initial: gameItem.initial,
+    hot: gameItem.hot,
+    type: 'game',
+    typeName: '游戏'
   });
 }
 
@@ -416,11 +397,11 @@ async function setDefaultGame(gameId: number) {
  */
 function clean(type: "game" | "server") {
   if (type == "game") {
-    console.debug("[game] clean game");
+    console.info("[game-picker] clean game");
     games.value.length = 0;
   }
   if (type == "server") {
-    console.debug("[game] clean server");
+    console.info("[game-picker] clean server");
     servers.value.length = 0;
   }
 }
@@ -447,17 +428,17 @@ function closePanel() {
 function moveToNextType() {
   const index = types.value.findIndex((m) => m == currentType.value);
   console.info(
-    "[game] moveToNextType",
+    "[game-picker] moveToNextType",
     currentType.value,
     index,
     types.value.length
   );
   if (index + 1 >= types.value.length) {
-    console.info("[game] 已经是最后一个类型了");
+    console.info("[game-picker] 已经是最后一个类型了");
     setCurrentType("");
   } else {
     const nextType = types.value[index + 1];
-    console.info("[game] nextType", nextType);
+    console.info("[game-picker] nextType", nextType);
     setCurrentType(nextType);
   }
 }
@@ -585,3 +566,11 @@ async function loadRemoteData() {
   });
 }
 </script>
+
+<style lang="scss" scoped>
+.game-picker-input {
+  :deep(.el-input__inner) {
+    cursor: pointer;
+  }
+}
+</style>
