@@ -25,9 +25,8 @@
     <div class="flex w-full gap-x-2">
       <template v-if="steps.length">
         <div v-for="item in steps" class="w-full">
-          <el-input :key="item.type" :placeholder="`请选择${item.typeName}`"
-            @click="handleInputClick(item.type)" class="game-picker-input" readonly :model-value="item.label"
-            :suffix-icon="Search" />
+          <el-input :key="item.type" :placeholder="`请选择${item.typeName}`" @click="handleInputClick(item.type)"
+            class="game-picker-input" readonly :model-value="item.label" :suffix-icon="Search" />
         </div>
       </template>
       <ElSkeleton v-else animated>
@@ -37,11 +36,11 @@
       </ElSkeleton>
     </div>
     <!-- 选择器2 -->
-     
+
     <!-- 内容面板分组 -->
     <div class="mt-1 absolute z-9999">
       <!-- 面板组件 -->
-      <GamePanel v-if="currentType" v-loading="isGameLoading" :data="currentItem" :type="currentType"
+      <GamePanel v-if="currentType" v-loading="isGameLoading || isServerLoading" :data="currentItem" :type="currentType"
         @item-click="handleItemClick" @recently-visited-click="handleRecentlyVisitedClick" @close="handlePanelClose" />
     </div>
   </div>
@@ -90,6 +89,7 @@ const model = defineModel<KV<number>[]>({ default: [] });
 const gameId = defineModel<number>("gameId");
 
 const isGameLoading = ref(false);
+const isServerLoading = ref(false);
 const types = ref<string[]>([]);
 const games = ref<GamePicker.TreeNodeVO[]>([]);
 const nodes = ref<GamePicker.TreeNodeVO[]>([]);
@@ -102,11 +102,15 @@ const selected = ref<GamePicker.SimpleOptionVM[]>([]);
  * 当前选中的类型
  */
 const currentType = ref<string>("");
-const whiteList = ["game", "region", "server"];
+/**
+ * 节点类型白名单
+ */
+const whiteList = ["game", "region", "server", "camp"];
 const whiteListNames = {
   game: "游戏",
   region: "地区",
   server: "服务器",
+  camp: "阵营",
 };
 /** =================组件计算属性=================== */
 
@@ -187,25 +191,24 @@ watch(
   { immediate: true }
 );
 
-watch(
-  () => gameId.value,
-  async (val: number | undefined) => {
-    if (val) {
-      console.log("[game picker] watch gameId value", val);
-      await loadServer(val);
-    } else {
-      clean("server");
-    }
-  }
-);
+// watch(
+//   () => gameId.value,
+//   async (val: number | undefined, old?: number) => {
+//     if (val !== old) {
+//       _changeGame(val || 0);
+//     }
+//   }
+// );
 
 watch(
   () => model.value,
   async (val: KV<number>[], old?: KV<number>[]) => {
-    console.debug("[game picker] watch model value", val, old);
-    if (JSON.stringify(val) !== JSON.stringify(old)) {
+    const _valList = val.map(m => ({ value: Number(m.value) }));
+    const _oldList = old?.map(m => ({ value: Number(m.value) }));
+    if (JSON.stringify(_valList) !== JSON.stringify(_oldList)) {
+      console.warn("[game picker] model change", _valList, _oldList);
       setDefaultValue(val);
-      emit("change", val, old, selectedServer.value);
+      emit("change", _unReactive(val), _unReactive(old), selectedServer.value);
     }
   }
 );
@@ -229,7 +232,7 @@ const handleInputClick = (type: string) => {
 };
 
 /**
- * 数据项点击事件
+ * 处理数据节点点击事件
  * @param type 数据项类型
  * @param item 数据项
  */
@@ -237,15 +240,8 @@ const handleItemClick = async (
   type: string,
   item: GamePicker.SimpleOptionVM
 ) => {
-  console.warn("[game-picker] child handleItemClick", type, item)
-  if (props.urlLinkage) {
-    // 动态设置 url 参数
-    Urls.addParam(type, String(item.value));
-  }
   if (type === "game") {
-    gameId.value = item.value;
-    // 重新加载服务器数据
-    await loadServer(item.value!);
+    _changeGame(item.value!);
   }
 
   moveToNextType();
@@ -254,6 +250,10 @@ const handleItemClick = async (
   emit("itemClick", type, item);
 };
 
+/**
+ * 处理最近选择点击事件
+ * @param gameId 游戏id
+ */
 const handleRecentlyVisitedClick = async (gameId: number) => {
   clean('server');
   currentType.value = "game";
@@ -276,77 +276,124 @@ const handlePanelClose = () => {
  * 从 URL 参数中设置默认值
  */
 function setDefaultValueWithQuery() {
+  console.debug("[game picker] setDefaultValueWithQuery");
   const params = Urls.readParams(window.location.href);
-  const obj = Object.fromEntries(params.entries());
-  console.debug("obj", obj);
-
   const kv: KV<number>[] = Array.from(params.entries()).map(([key, value]) => ({
     key,
     value,
   })) as any;
-
-  console.debug("kv", kv);
-
-  setDefaultValue(kv);
+  // 如果 kv 长度大于 0，且 kv 中的 key 在 whiteList 中，则设置默认值
+  if (kv.length > 0 && kv.some(m => whiteList.includes(m.key))) {
+    console.warn("[game picker] setDefaultValueWithQuery kv", kv);
+    setDefaultValue(kv);
+  }
 }
 
 /**
  * [核心方法]
  * 设置默认值
+ * cases:
+ * 1. 判断当前 games 是否加载过
+ * 1.1 如果未加载过，则加载游戏数据
+ * 1.2 如果已加载过，则不加载游戏数据
+ * 2. 传入的参数中游戏id不存在，提供服务器信息
+ * 2.1 以当前游戏id为游戏id，判断当前游戏的服务器是否已经加载过
+ * 2.1.1 如果未加载过，则加载服务器数据
+ * 2.2 如果传入参数没有类型，则为传入的参数添加类型
+ * 2.3 循环遍历传入的参数，判断节点是否存在，存在则调用 selectedItem 设置默认值，不存在且是第一个参数则退出整个方法，否则跳过本次设置默认值
+ * 3. 传入的参数中游戏id存在，提供服务器信息
+ * 3.1 以传入的游戏id为游戏id，查找游戏节点是否存在
+ * 3.1.1 如果游戏节点不存在，则加载游戏数据
+ * 3.1.1.1 加载游戏数据完毕后，查找游戏节点是否存在
+ * 3.1.1.2 如果游戏节点不存在，则提示游戏不存在
+ * 3.1.2 如果游戏节点存在，则判断是否需要加载服务器数据
+ * 3.1.2.1 如果需要加载服务器数据，则加载服务器数据
+ * 3.2 如果传入的参数没有类型，则为传入的参数添加类型
+ * 3.3 循环遍历传入的参数，判断节点是否存在，存在则调用 selectedItem 设置默认值，不存在且是第一个参数则退出整个方法，否则跳过本次设置默认值
  *
  * @param params 默认值
  * eg: [{key:'game',value:10},{key:'region',value:112},{key:'server',value:10}]
  */
 async function setDefaultValue(params?: KV<number>[]) {
-  if (!params) {
+  console.warn("[game picker] setDefaultValue start", JSON.stringify(params), params);
+  if (!params || params.length === 0) {
+    console.warn("[game picker] setDefaultValue params is empty");
+    _resetState();
     return;
   }
-  let _gameId = params.find((m) => m.key === "game")?.value;
-  for (const param of params) {
-    const node: GamePicker.TreeNodeVO | undefined = nodes.value.find(
-      (m) => m.type == param.key && m.id == param.value
-    );
-    // 设置默认值时后续数据可能还未加载或已加载数据发生了改变匹配不上，这时需要主动或重新加载数据。
-    if (!node) {
-      // 重新加载数据
-      switch (param.key) {
-        case "game":
-          _gameId = param.value;
-          console.debug(
-            `[game] 节点类型[${param.key}]的数据不存在，开始重新加载数据`
-          );
-          await loadData();
-          break;
-        default:
-          console.debug(
-            `[game] 节点类型[${param.key}]的数据不存在，开始重新加载数据`
-          );
-          if (!_gameId) {
-            console.warn("[game picker] 游戏id无效，跳过设置默认值");
-            break;
-          }
-          await loadServer(_gameId);
-          console.debug("[game] 服务器加载完毕", _gameId, Date.now());
-          break;
+
+  // 获取游戏id
+  const gameParam = params.find(m => m.key === "game");
+  let _gameId = gameParam ? Number(gameParam.value) : gameId.value;
+
+  // case 1: 传入的参数中游戏id不存在
+  if (!gameParam) {
+    // case 1.1: 判断当前游戏的服务器是否已经加载过
+    let _serverNode = servers.value.find(s => s.parentId === _gameId);
+    if (!_serverNode) {
+      // case 1.1.1: 未加载过,加载服务器数据
+      await loadServers(_gameId!);
+    }
+    // case 1.2: 为传入参数添加类型
+    attemptAddType(params);
+  }
+  // case 2: 传入的参数中游戏id存在
+  else {
+    // case 2.1: 查找游戏节点是否存在
+    let _gameNode = games.value.find(m => m.id === _gameId);
+    if (!_gameNode) {
+      // case 2.1.1: 游戏节点不存在,加载游戏数据
+      await loadRemoteData(_gameId);
+      _gameNode = games.value.find(m => m.id === _gameId);
+      if (!_gameNode) {
+        // case 2.1.1.2: 游戏节点不存在,提示游戏不存在
+        alert("游戏不存在");
+        return;
       }
     }
-    attemptAddType(params);
-    const _node: GamePicker.TreeNodeVO | undefined = nodes.value.find(
-      (m) => m.type == param.key && m.id == param.value
-    );
-    if (_node) {
-      console.debug(`[game picker] 设置默认值 type: ${param.key}`, param.value);
-      selectedItem(param.key, {
-        typeName: "",
-        options: [],
-        label: _node.name,
-        value: param.value,
-        type: param.key,
-        hot: _node.hot,
-        initial: _node.initial,
-      });
+    // case 2.1.2: 判断是否需要加载服务器数据
+    let _serverNode = servers.value.find(s => s.parentId === _gameId);
+    if (!_serverNode) {
+      // case 2.1.2.1: 加载服务器数据
+      await loadServers(_gameId!);
     }
+    // case 2.2: 为传入参数添加类型
+    attemptAddType(params);
   }
+
+  // 先按 types 排序，再按 whiteList 过滤并排序参数
+  params = params
+    .filter(m => types.value.includes(m.key))
+    .filter(m => whiteList.includes(m.key))
+    .sort((a, b) => whiteList.indexOf(a.key) - whiteList.indexOf(b.key)) as KV<number>[];
+
+  console.warn("[game picker] params filter and sort", params.map(m => `${m.key}:${m.value}`).join(','));
+
+
+  // case 1.3 & 2.3: 循环遍历传入的参数,设置默认值
+  for (const param of params) {
+    console.warn("[game picker] 循环遍历传入的参数", param);
+    const node = nodes.value.find(m => m.type === param.key && m.id === Number(param.value));
+    if (!node) {
+      // 如果是第一个参数且不存在,退出整个方法
+      if (param === params[0]) {
+        return;
+      }
+      // 否则跳过本次设置默认值
+      continue;
+    }
+    console.warn("[game picker] 循环遍历传入的参数,设置默认值", param.key, param.value);
+    selectedItem(param.key, {
+      typeName: "",
+      options: [],
+      label: node.name,
+      value: param.value,
+      type: param.key,
+      hot: node.hot,
+      initial: node.initial,
+    });
+  }
+  console.warn("[game picker] setDefaultValue finish");
 }
 
 /**
@@ -354,73 +401,19 @@ async function setDefaultValue(params?: KV<number>[]) {
  * @param params 商品定位参数
  */
 function attemptAddType(params: KV<number>[]) {
-  if (types.value.length === 0) {
-    return;
+  if (types.value.length === 0 || params.every(m => m.key !== "unknown")) {
+    console.warn("[game picker] attemptAddType 忽略", params);
   }
-  for (let i = 0; i < params.length; i++) {
-    const element = params[i];
-    if (!whiteList.includes(element.key)) {
-      element.key = types.value[i];
+  else {
+    for (let i = 0; i < params.length; i++) {
+      const element = params[i];
+      if (!whiteList.includes(element.key)) {
+        element.key = types.value[i];
+      }
     }
   }
 }
 
-/**
- * [核心方法]
- * 设置默认游戏
- * @param gameId 游戏id
- */
-async function setDefaultGame(gameId: number) {
-  if (!gameId) {
-    return;
-  }
-  const params: KV<number>[] = [];
-  const gameNode = games.value.find((m) => m.id == gameId);
-  if (!gameNode) {
-    await loadData();
-  }
-  params.push({ key: "game", value: gameId });
-  await loadServer(gameId);
-  for (const type of types.value) {
-    const node = servers.value.filter((m) => m.type === type)[0];
-    if (node) {
-      params.push({ key: type, value: node.id });
-    }
-  }
-  console.debug("[game] setDefaultGame", params);
-  await setDefaultValue(params);
-}
-
-/**
- * 清理数据
- * @param type 'game' | 'server'
- */
-function clean(type: "game" | "server") {
-  if (type == "game") {
-    console.info("[game-picker] clean game");
-    games.value.length = 0;
-  }
-  if (type == "server") {
-    console.info("[game-picker] clean server");
-    servers.value.length = 0;
-  }
-}
-
-/**
- * 设置当前选项类型
- * @param type 选项类型
- */
-function setCurrentType(type: string) {
-  console.debug("[game] type change", type);
-  currentType.value = type;
-}
-
-/**
- * 关闭面板
- */
-function closePanel() {
-  setCurrentType("");
-}
 
 /**
  * 将当前指针移动到下一个类型
@@ -473,24 +466,121 @@ function selectedItem(type: string, item: GamePicker.OptionVM) {
   }
 
   if (type === "game") {
-    gameId.value = item.value;
+    _changeGame(item.value!);
   }
-  //
-  model.value = selected.value.map((m) => ({ key: m.type, value: m.value!, label: m.label }));
+  // 在组件选择完成所有选项时，更新 model 的值
+  const _model = selected.value.map((m) => ({ key: m.type, value: m.value!, label: m.label }));
+  if (types.value.length === _model.length) {
+    model.value = _model;
+  }
+  // 如果 urlLinkage 为 true，则动态设置 url 参数
+  if (props.urlLinkage) {
+    // 清理 url 参数
+    types.value.forEach(m => Urls.removeParam(m));
+    // 动态设置 url 参数
+    selected.value.forEach(m => Urls.addParam(m.type, String(m.value)));
+  }
   // 触发选择事件
   emit("select", selected.value);
 }
 
-/** =================辅助函数=================== */
-async function loadData(loadSuccess?: GamePicker.LoadSuccessFn) {
-  const { data, error } = await listGameAsTree();
-  if (error) {
-    console.error("[game picker] loadData", error);
+
+/**
+ * [核心方法]
+ * 设置默认游戏
+ * @param gameId 游戏id
+ */
+async function setDefaultGame(gameId: number) {
+  if (!gameId) {
+    return;
   }
+  const params: KV<number>[] = [];
+  const gameNode = games.value.find((m) => m.id == gameId);
+  if (!gameNode) {
+    await loadGames();
+  }
+  params.push({ key: "game", value: gameId });
+  await loadServers(gameId);
+  for (const type of types.value) {
+    const node = servers.value.filter((m) => m.type === type)[0];
+    if (node) {
+      params.push({ key: type, value: node.id });
+    }
+  }
+  console.debug("[game] setDefaultGame", params);
+  await setDefaultValue(params);
+}
+
+/**
+ * 清理数据
+ * @param type 'game' | 'server'
+ */
+function clean(type: "game" | "server") {
+  if (type == "game") {
+    console.info("[game-picker] clean game");
+    games.value.length = 0;
+  }
+  if (type == "server") {
+    console.info("[game-picker] clean server");
+    servers.value.length = 0;
+  }
+}
+
+/**
+ * 设置当前选项类型
+ * @param type 选项类型
+ */
+function setCurrentType(type: string) {
+  console.debug("[game] type change", type);
+  currentType.value = type;
+}
+
+/**
+ * 关闭面板
+ */
+function closePanel() {
+  setCurrentType("");
+}
+
+/**
+ * 重置状态
+ */
+function _resetState() {
+  selected.value = [];
+  Urls.removeParam("game");
+  Urls.removeParam("region");
+  Urls.removeParam("server");
+}
+
+const _changeGame = async (id: number) => {
+  gameId.value = id;
+  // 判断是否已加载过
+  if (servers.value.find(m => m.parentId === id)) {
+    return;
+  }
+  await loadServers(id);
+}
+
+/** =================辅助函数=================== */
+
+/**
+ * 加载游戏数据
+ * @param loadSuccess 数据加载完毕的回调函数
+ */
+async function loadGames(loadSuccess?: GamePicker.LoadSuccessFn) {
+  isGameLoading.value = true;
+  const { data, error } = await listGameAsTree();
+  isGameLoading.value = false;
+  if (error) {
+    console.error("[game picker] loadGames", error);
+  }
+  console.warn("[game picker] loadGames finish");
   if (data) {
-    const formated = formatDate(data, "game");
+    const formated = _formatDate(data, "game");
     games.value = [...formated];
     nodes.value = [...formated];
+    // 设置游戏id
+    gameId.value = formated[0].id;
     if (loadSuccess) {
       loadSuccess(formated);
     }
@@ -502,19 +592,20 @@ async function loadData(loadSuccess?: GamePicker.LoadSuccessFn) {
  * @param gameId 游戏id
  * @param loadSuccess 数据加载完毕的回调函数
  */
-async function loadServer(
+async function loadServers(
   gameId: number,
   loadSuccess?: GamePicker.LoadSuccessFn
 ) {
-  isGameLoading.value = true;
+  isServerLoading.value = true;
   const { data, error } = await listServerAsTreeByGameId(gameId);
-  isGameLoading.value = false;
+  isServerLoading.value = false;
   if (error) {
-    console.error("[game picker] loadServer", error);
+    console.error("[game picker] loadServers", error);
   }
+  console.warn("[game picker] loadServers finish");
   const list = Trees.flatten(data as any) as GamePicker.TreeNodeVO[];
-  types.value = ["game", ...extractUniqueTypes(list as any)];
-  const formated = formatDate(list, "server");
+  types.value = ["game", ..._extractUniqueTypes(list as any)];
+  const formated = _formatDate(list, "server");
   nodes.value = [...games.value, ...formated];
   servers.value = [...formated];
   if (loadSuccess) {
@@ -522,11 +613,12 @@ async function loadServer(
   }
 }
 
+
 /**
  * 格式化数据
  * @param nodes 节点数据
  */
-function formatDate(nodes: GamePicker.TreeNodeVO[], type: string): GamePicker.TreeNodeVO[] {
+function _formatDate(nodes: GamePicker.TreeNodeVO[], type: string): GamePicker.TreeNodeVO[] {
   const formated = nodes.map((n) => {
     return {
       id: n.id!,
@@ -547,8 +639,23 @@ function formatDate(nodes: GamePicker.TreeNodeVO[], type: string): GamePicker.Tr
   }
 }
 
-function extractUniqueTypes(data: GamePicker.TreeNodeVO[]): string[] {
+function _extractUniqueTypes(data: GamePicker.TreeNodeVO[]): string[] {
   return [...new Set(data.map((item) => item.type))];
+}
+
+function _unReactive(val: any) {
+  return JSON.parse(JSON.stringify(val));
+}
+
+/**
+ * 加载远程数据
+ * @param gameId 游戏id
+ */
+async function loadRemoteData(gameId?: number) {
+  await loadGames(async (data) => {
+    const game = data[0];
+    await loadServers(gameId || game.id);
+  });
 }
 
 onMounted(async () => {
@@ -558,13 +665,7 @@ onMounted(async () => {
   setDefaultValueWithQuery();
 });
 
-async function loadRemoteData() {
-  await loadData(async (data) => {
-    const game = data[0];
-    console.log("[game picker] loadRemoteData", game.id);
-    await loadServer(game.id);
-  });
-}
+
 </script>
 
 <style lang="scss" scoped>
