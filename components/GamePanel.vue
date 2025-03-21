@@ -135,10 +135,17 @@ const filteredData = computed(() => {
   return _arr;
 })
 
+/**
+ * 清除关键字
+ */
 const cleanKeyword = () => {
   GamePickers.log("cleanKeyword", keyword.value)
   keyword.value = ""
 }
+
+/**
+ * 重置字母索引状态
+ */
 const resetLetter = () => {
   GamePickers.log("resetLetter", letter.value)
   letter.value = ALL
@@ -205,5 +212,10 @@ const saveRecentlyVisited = (item: GamePicker.SimpleOptionVM) => {
 
 onMounted(() => {
   getRecentlyVisited()
+})
+
+defineExpose({
+  cleanKeyword,
+  resetLetter
 })
 </script>

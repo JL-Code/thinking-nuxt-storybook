@@ -25,7 +25,7 @@
     <!-- 选择器1 -->
     <div class="flex w-full gap-x-2">
       <template v-if="steps.length">
-        <div v-for="item in steps" class="w-full">
+        <div v-for="item in steps" class="w-full" :key="item.type">
           <el-input :key="item.type" :placeholder="`请选择${item.typeName}`"
             @click="handleInputClick(item.type as NodeType)" class="game-picker-input" readonly
             :model-value="item.label" :suffix-icon="Search" />
@@ -42,8 +42,9 @@
     <!-- 内容面板分组 -->
     <div class="mt-1 absolute z-9999">
       <!-- 面板组件 -->
-      <GamePanel v-if="currentType" v-loading="isGameLoading || isServerLoading" :data="currentItem" :type="currentType"
-        @item-click="handleItemClick" @recently-visited-click="handleRecentlyVisitedClick" @close="handlePanelClose" />
+      <GamePanel ref="panelRef" v-if="currentType" v-loading="isGameLoading || isServerLoading" :data="currentItem"
+        :type="currentType" @item-click="handleItemClick" @recently-visited-click="handleRecentlyVisitedClick"
+        @close="handlePanelClose" />
     </div>
   </div>
   <!-- 游戏选择器组件E -->
@@ -54,6 +55,7 @@
 import _ from "lodash";
 import { Search } from "@element-plus/icons-vue";
 import { listGameAsTree, listServerAsTreeByGameId } from "./api";
+import type { GamePanel } from "#components";
 
 /**
  * 游戏选择器组件 props
@@ -150,6 +152,7 @@ const whiteListNames = {
   server: "服务器",
   camp: "阵营",
 };
+const panelRef = useTemplateRef<InstanceType<typeof GamePanel>>("panelRef");
 /** =================组件计算属性=================== */
 const disabled = computed(() => {
   return isGameLoading.value || isServerLoading.value;
@@ -247,6 +250,7 @@ const handleInputClick = (type: NodeType) => {
   }
   console.debug("[game-picker] 选中", type);
   _setCurrentType(type);
+  panelRef.value?.resetLetter();
 };
 
 /**
