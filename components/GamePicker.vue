@@ -28,7 +28,16 @@
         <div v-for="item in steps" class="w-full" :key="item.type">
           <el-input :key="item.type" :placeholder="`请选择${item.typeName}`"
             @click="handleInputClick(item.type as NodeType)" class="game-picker-input" readonly
-            :model-value="item.label" :suffix-icon="Search" />
+            :model-value="item.label">
+            <template #suffix>
+              <el-icon v-if="disabled" class="is-loading">
+                <Loading />
+              </el-icon>
+              <el-icon v-else>
+                <Search />
+              </el-icon>
+            </template>
+          </el-input>
         </div>
       </template>
       <ElSkeleton v-else animated>
@@ -53,7 +62,7 @@
 // ssr 时数据由调用者传入
 // 非 ssr 时数据由组件内部调用
 import _ from "lodash";
-import { Search } from "@element-plus/icons-vue";
+import { Search, Loading } from "@element-plus/icons-vue";
 import { listGameAsTree, listServerAsTreeByGameId } from "./api";
 import type { GamePanel } from "#components";
 
@@ -546,14 +555,6 @@ function clean(type: "game" | "server") {
 }
 
 /**
- * 设置当前选项类型
- * @param type 选项类型
- */
-function _setCurrentType(type: NodeType | undefined) {
-  currentType.value = type;
-}
-
-/**
  * 关闭面板
  */
 function closePanel() {
@@ -561,12 +562,20 @@ function closePanel() {
 }
 
 /**
+ * 设置当前选项类型
+ * @param type 选项类型
+ */
+function _setCurrentType(type: NodeType | undefined) {
+  currentType.value = type;
+}
+
+
+/**
  * 重置状态
  */
 function _resetState() {
   selected.value = [];
   gameId.value = undefined;
-  types.value = ['game'];
   Urls.removeParam("game");
   Urls.removeParam("region");
   Urls.removeParam("server");
@@ -590,6 +599,7 @@ const _changeGame = async (id: number) => {
  * @param loadSuccess 数据加载完毕的回调函数
  */
 async function loadGames(loadSuccess?: GamePicker.LoadSuccessFn) {
+  GamePickers.log("loadGames start");
   isGameLoading.value = true;
   const { data, error } = await listGameAsTree(props.mock);
   if (error) {
