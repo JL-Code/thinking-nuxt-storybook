@@ -60,6 +60,10 @@ import { listGameAsTree, listServerAsTreeByGameId } from "./api";
  */
 interface Props {
   /**
+   * 是否为 mock 数据
+   */
+  mock?: boolean;
+  /**
    * 调试模式
    */
   debug?: boolean;
@@ -106,6 +110,7 @@ interface UrlParseResult {
 type NodeType = keyof PickerRoute;
 
 const props = withDefaults(defineProps<Props>(), {
+  mock: false,
   debug: false,
   urlLinkage: true,
   data: () => []
@@ -582,7 +587,7 @@ const _changeGame = async (id: number) => {
  */
 async function loadGames(loadSuccess?: GamePicker.LoadSuccessFn) {
   isGameLoading.value = true;
-  const { data, error } = await listGameAsTree();
+  const { data, error } = await listGameAsTree(props.mock);
   if (error) {
     console.error("loadGames", error);
     alert("加载游戏数据失败");
@@ -613,7 +618,7 @@ async function loadServers(
 ) {
   GamePickers.log("loadServers start", gameId);
   isServerLoading.value = true;
-  const { data, error } = await listServerAsTreeByGameId(gameId);
+  const { data, error } = await listServerAsTreeByGameId(gameId, props.mock);
   if (error) {
     alert("加载游戏服务器数据失败");
     return;
@@ -696,7 +701,9 @@ onMounted(async () => {
 
   // 1.尝试解析 URL 参数，如果有 game 参数，则加载服务器数据时，使用 game 参数，否则直接加载远程数据
   const { route } = parseUrlParams(window.location.href);
-  await loadRemoteData(route.game);
+  if (props.data.length === 0) {
+    await loadRemoteData(route.game);
+  }
   await setDefaultValueWithQuery();
 });
 

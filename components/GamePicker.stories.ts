@@ -29,6 +29,7 @@ const games:GamePicker.TreeNodeVO[] = [
 export const Default: Story = {
     args: {
         data: games,
+        mock: true,
     },
 }   
 

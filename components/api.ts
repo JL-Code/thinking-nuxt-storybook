@@ -1,11 +1,11 @@
-const mock = false;
 const apiBase = "http://test.bijiaqi.com";
 
 /**
  * 获取游戏树
+ * @param mock 是否为 mock 数据
  * @returns 游戏树
  */
-export async function listGameAsTree() {
+export async function listGameAsTree(mock: boolean = false) {
   if (mock) {
     return Promise.resolve<PromiseReturnType<GamePicker.TreeNodeVO[]>>({
       data: [],
@@ -30,9 +30,13 @@ export async function listGameAsTree() {
 /**
  * 根据游戏id获取服务器树
  * @param gameId 游戏id
+ * @param mock 是否为 mock 数据
  * @returns 服务器树
  */
-export async function listServerAsTreeByGameId(gameId: number) {
+export async function listServerAsTreeByGameId(
+  gameId: number,
+  mock: boolean = false
+) {
   if (mock) {
     return Promise.resolve<PromiseReturnType<GamePicker.TreeNodeVO[]>>({
       data: [
