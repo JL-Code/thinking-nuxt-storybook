@@ -5,6 +5,7 @@
     <div v-if="debug">
       <el-card>
         <p>[state] isGameLoading: {{ isGameLoading }}</p>
+        <p>[state] isServerLoading: {{ isServerLoading }}</p>
         <p>[state] gameId: {{ gameId }}</p>
         <p>[state] currentType: {{ currentType }}</p>
         <p>[state] selected: {{ selected }}</p>
@@ -25,15 +26,8 @@
     <div class="flex w-full gap-x-2">
       <template v-if="steps.length">
         <div v-for="item in steps" class="w-full">
-          <el-input
-            :key="item.type"
-            :placeholder="`请选择${item.typeName}`"
-            @click="handleInputClick(item.type)"
-            class="game-picker-input"
-            readonly
-            :model-value="item.label"
-            :suffix-icon="Search"
-          />
+          <el-input :key="item.type" :placeholder="`请选择${item.typeName}`" @click="handleInputClick(item.type)"
+            class="game-picker-input" readonly :model-value="item.label" :suffix-icon="Search" />
         </div>
       </template>
       <ElSkeleton v-else animated>
@@ -47,15 +41,8 @@
     <!-- 内容面板分组 -->
     <div class="mt-1 absolute z-9999">
       <!-- 面板组件 -->
-      <GamePanel
-        v-if="currentType"
-        v-loading="isGameLoading || isServerLoading"
-        :data="currentItem"
-        :type="currentType"
-        @item-click="handleItemClick"
-        @recently-visited-click="handleRecentlyVisitedClick"
-        @close="handlePanelClose"
-      />
+      <GamePanel v-if="currentType" v-loading="isGameLoading || isServerLoading" :data="currentItem" :type="currentType"
+        @item-click="handleItemClick" @recently-visited-click="handleRecentlyVisitedClick" @close="handlePanelClose" />
     </div>
   </div>
   <!-- 游戏选择器组件E -->
@@ -64,6 +51,7 @@
 // ssr 时数据由调用者传入
 // 非 ssr 时数据由组件内部调用
 import _ from "lodash";
+import { dayjs } from "element-plus";
 import { Search } from "@element-plus/icons-vue";
 import { listGameAsTree, listServerAsTreeByGameId } from "./api";
 interface Props {
@@ -80,7 +68,35 @@ interface Props {
    */
   data?: GamePicker.TreeNodeVO[];
 }
-type NodeType = "game" | "region" | "server" | "camp";
+/**
+ * 游戏选择器路由
+ */
+interface PickerRoute {
+  /**
+   * 游戏id
+   */
+  game: number;
+  /**
+   * 地区id
+   */
+  region: number;
+  /**
+   * 服务器id
+   */
+  server: number;
+  /**
+   * 阵营id
+   */
+  camp: number;
+}
+/**
+ * 解析 URL 参数
+ */
+interface UrlParseResult {
+  route: Partial<PickerRoute>;
+  kv: KV<number>[];
+}
+type NodeType = keyof PickerRoute;
 const props = withDefaults(defineProps<Props>(), {
   debug: false,
   urlLinkage: true,
@@ -96,12 +112,9 @@ const emit = defineEmits<{
 /** =================组件状态=================== */
 
 const model = defineModel<KV<number>[]>({ default: [] });
-const gameId = defineModel<number>("gameId",{required:false});
+const gameId = defineModel<number>("gameId", { required: false });
 const isGameLoading = ref(false);
 const isServerLoading = ref(false);
-const disabled = computed(() => {
-  return isGameLoading.value || isServerLoading.value;
-});
 const types = ref<string[]>([]);
 const games = ref<GamePicker.TreeNodeVO[]>([]);
 const nodes = ref<GamePicker.TreeNodeVO[]>([]);
@@ -125,7 +138,9 @@ const whiteListNames = {
   camp: "阵营",
 };
 /** =================组件计算属性=================== */
-
+const disabled = computed(() => {
+  return isGameLoading.value || isServerLoading.value;
+});
 /**
  * 组件选择完成
  * isCompleted 需要判断同一个路径上的数据是否加载完毕
@@ -194,26 +209,17 @@ watch(
 );
 
 watch(
-  () => gameId.value,
-  async (val: number | undefined, old?: number) => {
-    if (val && val !== old) {
-      _changeGame(val);
-    }
-  }
-);
-
-watch(
   () => model.value,
   async (val: KV<number>[], old?: KV<number>[]) => {
-    const _valList = val.map(m => ({ key:m.key, value: Number(m.value) }));
-    const _oldList = old?.map(m => ({ key:m.key, value: Number(m.value) }));
+    const _valList = val.map(m => ({ key: m.key, value: Number(m.value) }));
+    const _oldList = old?.map(m => ({ key: m.key, value: Number(m.value) }));
     if (JSON.stringify(_valList) !== JSON.stringify(_oldList)) {
       _log("model change", _valList, _oldList);
       setDefaultValue(val);
       emit("change", _unReactive(val), _unReactive(old), selectedServer.value);
     }
   },
-  { deep: true, immediate: true }
+  { deep: true, immediate: false }
 );
 
 /** =================组件方法=================== */
@@ -273,20 +279,44 @@ const handlePanelClose = () => {
 };
 
 /**
- * 从 URL 参数中设置默认值
+ * 设置默认值，从 URL 参数中获取
  */
-function setDefaultValueWithQuery() {
-  _log("setDefaultValueWithQuery start");
-  const params = Urls.readParams(window.location.href);
-  const kv: KV<number>[] = Array.from(params.entries()).map(([key, value]) => ({
-    key,
-    value,
-  })) as any;
+async function setDefaultValueWithQuery() {
+  _log("设置默认值从 URL 参数，开始");
+  const { kv } = parseUrlParams(window.location.href);
   // 如果 kv 长度大于 0，且 kv 中的 key 在 whiteList 中，则设置默认值
   if (kv.length > 0 && kv.some(m => whiteList.includes(m.key as NodeType))) {
-    _log("setDefaultValueWithQuery kv", kv);
-    setDefaultValue(kv);
+    _log("设置默认值从 URL 参数，结束，找到可用的 URL 参数", kv);
+    await setDefaultValue(kv);
   }
+  else {
+    _log("设置默认值从 URL 参数，结束，没有找到可用的 URL 参数");
+  }
+}
+
+/**
+ * 解析 URL 参数
+ * @param url url参数，eg: http://localhost:8080?game=10&region=112&server=10
+ * @returns {route: Partial<PickerRoute>, kv: KV<number>[]}
+ */
+function parseUrlParams(url: string): UrlParseResult {
+  const params = Urls.readParams(url);
+  const kv: KV<number>[] = Array.from(params.entries()).map(([key, value]) => ({
+    key,
+    value: Number(value),
+  }));
+
+  const route: Partial<PickerRoute> = {
+    game: kv.find(m => m.key === "game")?.value,
+    region: kv.find(m => m.key === "region")?.value,
+    server: kv.find(m => m.key === "server")?.value,
+    camp: kv.find(m => m.key === "camp")?.value,
+  };
+
+  return {
+    route,
+    kv
+  };
 }
 
 /**
@@ -315,9 +345,9 @@ function setDefaultValueWithQuery() {
  * eg: [{key:'game',value:10},{key:'region',value:112},{key:'server',value:10}]
  */
 async function setDefaultValue(params?: KV<number>[]) {
-  _log("setDefaultValue start", JSON.stringify(params));
+  _log("设置默认值 start", JSON.stringify(params));
   if (!params || params.length === 0) {
-    _log("setDefaultValue params is empty");
+    _log("设置默认值 params 为空");
     _resetState();
     return;
   }
@@ -392,7 +422,7 @@ async function setDefaultValue(params?: KV<number>[]) {
       initial: node.initial,
     });
   }
-  _log("setDefaultValue finish");
+  _log("设置默认值 finish");
 }
 
 /**
@@ -484,32 +514,6 @@ function selectedItem(type: string, item: GamePicker.OptionVM) {
 
 
 /**
- * [核心方法]
- * 设置默认游戏
- * @param gameId 游戏id
- */
-async function setDefaultGame(gameId: number) {
-  if (!gameId) {
-    return;
-  }
-  const params: KV<number>[] = [];
-  const gameNode = games.value.find((m) => m.id == gameId);
-  if (!gameNode) {
-    await loadGames();
-  }
-  params.push({ key: "game", value: gameId });
-  await loadServers(gameId);
-  for (const type of types.value) {
-    const node = servers.value.filter((m) => m.type === type)[0];
-    if (node) {
-      params.push({ key: type, value: node.id });
-    }
-  }
-  console.debug("[game] setDefaultGame", params);
-  await setDefaultValue(params);
-}
-
-/**
  * 清理数据
  * @param type 'game' | 'server'
  */
@@ -570,11 +574,11 @@ const _changeGame = async (id: number) => {
 async function loadGames(loadSuccess?: GamePicker.LoadSuccessFn) {
   isGameLoading.value = true;
   const { data, error } = await listGameAsTree();
-  isGameLoading.value = false;
   if (error) {
     console.error("loadGames", error);
+    alert("加载游戏数据失败");
+    return;
   }
-  _log("loadGames finish");
   if (data) {
     const formated = _formatDate(data, "game");
     games.value = [...formated];
@@ -585,6 +589,8 @@ async function loadGames(loadSuccess?: GamePicker.LoadSuccessFn) {
       loadSuccess(formated);
     }
   }
+  isGameLoading.value = false;
+  _log("loadGames finish");
 }
 
 /**
@@ -596,11 +602,12 @@ async function loadServers(
   gameId: number,
   loadSuccess?: GamePicker.LoadSuccessFn
 ) {
+  _log("loadServers start", gameId);
   isServerLoading.value = true;
   const { data, error } = await listServerAsTreeByGameId(gameId);
-  isServerLoading.value = false;
   if (error) {
-    console.error("loadServers", error);
+    alert("加载游戏服务器数据失败");
+    return;
   }
   _log("loadServers finish");
   const list = Trees.flatten(data as any) as GamePicker.TreeNodeVO[];
@@ -611,6 +618,7 @@ async function loadServers(
   if (loadSuccess) {
     loadSuccess(formated);
   }
+  isServerLoading.value = false;
 }
 
 
@@ -656,34 +664,37 @@ function _unReactive(val: any) {
  * @param args 日志内容
  */
 function _log(...args: any[]) {
-  const fixedPrefix = [`%cGamePicker %c`,
-      "color: black; border-radius: 3px 0 0 3px; padding: 2px 2px 1px 10px; background: #00DC82",
-      "border-radius: 0 3px 3px 0; padding: 2px 10px 1px 2px; background: #00DC8220"];
-  console.info(...[...fixedPrefix, ...args]);
+  const fixedPrefix = [`🎉%cGamePicker%c`,
+    "color: black; border-radius: 3px 0 0 3px; padding: 2px 2px 1px 10px; background: #00DC82",
+    "border-radius: 0 3px 3px 0; padding: 2px 10px 1px 2px; background: #00DC8220"];
+  console.info(...[...fixedPrefix, ...args], dayjs().format("YYYY-MM-DD HH:mm:ss.SSS"));
 }
 
 /**
  * 加载远程数据
- * @param gameId 游戏id
+ * @param game 游戏id
  */
-async function loadRemoteData(gameId?: number) {
-  await loadGames(async (data) => {
-    const game = data[0];
-    await loadServers(gameId || game.id);
-  });
+async function loadRemoteData(game?: number) {
+  if (isGameLoading.value || isServerLoading.value) {
+    return;
+  }
+  await loadGames();
+  const firstGame = games.value[0];
+  await loadServers(game || firstGame.id);
 }
 
 onMounted(async () => {
-  if (props.data.length === 0) {
-    await loadRemoteData();
-  }
-  setDefaultValueWithQuery();
+  _log("onMounted");
+
+  // 1.尝试解析 URL 参数，如果有 game 参数，则加载服务器数据时，使用 game 参数，否则直接加载远程数据
+  const { route } = parseUrlParams(window.location.href);
+  await loadRemoteData(route.game);
+  await setDefaultValueWithQuery();
 });
 
 /** =================暴露的方法=================== */
 
 defineExpose({
-  setDefaultGame,
   setDefaultValue,
 });
 </script>

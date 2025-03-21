@@ -7,8 +7,7 @@
           <div>model:{{ value }}</div>
         </div>
         <div class="w-100 flex flex-col gap-2">
-          <GamePicker v-model="value" />
-          <!-- <GamePicker2 v-model="model2" /> -->
+          <GamePicker v-model="value" debug @change="onChange" />
         </div>
         <div class="mt-2 flex flex-wrap gap-2">
           <NuxtLink to="/">返回首页</NuxtLink>
@@ -19,25 +18,13 @@
           <h1>手动设置选中值</h1>
           游戏id：
           <ElSelect v-model="gameId" placeholder="请选择游戏">
-            <ElOption
-              v-for="item in gameIds"
-              :key="item"
-              :label="item"
-              :value="item"
-            />
+            <ElOption v-for="item in gameIds" :key="item" :label="item" :value="item" />
           </ElSelect>
           服务器索引：
           <ElSelect v-model="serverIndex" placeholder="请选择服务器">
-            <ElOption
-              v-for="item in serverIndexs"
-              :key="item"
-              :label="item"
-              :value="item"
-            />
+            <ElOption v-for="item in serverIndexs" :key="item" :label="item" :value="item" />
           </ElSelect>
-          <ElButton @click="setGameIdAndServerIndex(gameId, serverIndex)"
-            >设置选中值</ElButton
-          >
+          <ElButton @click="setGameIdAndServerIndex(gameId, serverIndex)">设置选中值</ElButton>
         </div>
       </UCard>
     </UContainer>
@@ -68,6 +55,17 @@ const value = ref<KV<number>[]>([
 const resetState = () => {
   value.value = [];
 };
+
+watch(value, (val, oldVal) => {
+  if (JSON.stringify(val) !== JSON.stringify(oldVal)) {
+    console.warn("[playground] model value", JSON.stringify(val), JSON.stringify(oldVal));
+  }
+});
+
+const onChange = (val: KV<number>[], oldVal?: KV<number>[]) => {
+  console.warn("[playground] onChange", JSON.stringify(val), JSON.stringify(oldVal));
+}
+
 /**
  *
  * @param gameId 游戏id
