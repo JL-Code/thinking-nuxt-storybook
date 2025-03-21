@@ -5,7 +5,7 @@
       <div class="flex items-center gap-x-2">
         <el-text type="info" size="small">最近选择：</el-text>
         <div class="flex gap-x-2">
-          <div v-for="item in recentlyVisited" :key="item.value" @click="handleRecentlyVisitedClick(item.value!)"
+          <div v-for="item in recentlyVisitedTop5" :key="item.value" @click="handleRecentlyVisitedClick(item.value!)"
             class="cursor-pointer line-clamp-1 hover:underline text-xs">
             {{ item.label }}
           </div>
@@ -136,16 +136,16 @@ const filteredData = computed(() => {
 })
 
 const cleanKeyword = () => {
-  _log("cleanKeyword", keyword.value)
+  GamePickers.log("cleanKeyword", keyword.value)
   keyword.value = ""
 }
 const resetLetter = () => {
-  _log("resetLetter", letter.value)
+  GamePickers.log("resetLetter", letter.value)
   letter.value = ALL
 }
 
 const handleItemClick = (item: GamePicker.SimpleOptionVM) => {
-  _log("handleItemClick", item)
+  GamePickers.log("handleItemClick", item)
   cleanKeyword();
   resetLetter();
   if (rootProps.type === "game") {
@@ -157,37 +157,50 @@ const handleItemClick = (item: GamePicker.SimpleOptionVM) => {
 
 
 /**
- * 最近访问机制
+ * ================== 最近访问 ==================
  */
 
+/**
+ * 最近访问点击
+ * @param gameId 游戏id
+ */
 const handleRecentlyVisitedClick = (gameId: number) => {
-  _log("handleRecentlyVisitedClick", gameId)
+  GamePickers.log("handleRecentlyVisitedClick", gameId)
   cleanKeyword();
   resetLetter();
   emit('recentlyVisitedClick', gameId)
 }
 
+/**
+ * 最近访问
+ */
 const recentlyVisited = ref<GamePicker.SimpleOptionVM[]>([])
 
+/**
+ * 最近访问前5个
+ */
+const recentlyVisitedTop5 = computed(() => {
+  return recentlyVisited.value.slice(-5)
+})
+
+/**
+ * 获取最近访问
+ */
 const getRecentlyVisited = () => {
   const _cache = localStorage.getItem('recentlyVisited')
   recentlyVisited.value = _cache ? JSON.parse(_cache) : []
 }
 
+/**
+ * 保存最近访问
+ * @param item 游戏项
+ */
 const saveRecentlyVisited = (item: GamePicker.SimpleOptionVM) => {
   if (recentlyVisited.value.some(m => m.value === item.value)) {
     return;
   }
   recentlyVisited.value.push(item)
   localStorage.setItem('recentlyVisited', JSON.stringify(recentlyVisited.value))
-}
-
-/**
- * 打印日志
- * @param args 日志内容
- */
-function _log(...args: any[]) {
-  console.info(...['%c[game panel]', 'color: green;', ...args]);
 }
 
 onMounted(() => {

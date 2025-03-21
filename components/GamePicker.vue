@@ -26,8 +26,9 @@
     <div class="flex w-full gap-x-2">
       <template v-if="steps.length">
         <div v-for="item in steps" class="w-full">
-          <el-input :key="item.type" :placeholder="`请选择${item.typeName}`" @click="handleInputClick(item.type)"
-            class="game-picker-input" readonly :model-value="item.label" :suffix-icon="Search" />
+          <el-input :key="item.type" :placeholder="`请选择${item.typeName}`"
+            @click="handleInputClick(item.type as NodeType)" class="game-picker-input" readonly
+            :model-value="item.label" :suffix-icon="Search" />
         </div>
       </template>
       <ElSkeleton v-else animated>
@@ -51,9 +52,12 @@
 // ssr 时数据由调用者传入
 // 非 ssr 时数据由组件内部调用
 import _ from "lodash";
-import { dayjs } from "element-plus";
 import { Search } from "@element-plus/icons-vue";
 import { listGameAsTree, listServerAsTreeByGameId } from "./api";
+
+/**
+ * 游戏选择器组件 props
+ */
 interface Props {
   /**
    * 调试模式
@@ -96,7 +100,11 @@ interface UrlParseResult {
   route: Partial<PickerRoute>;
   kv: KV<number>[];
 }
+/**
+ * 节点类型
+ */
 type NodeType = keyof PickerRoute;
+
 const props = withDefaults(defineProps<Props>(), {
   debug: false,
   urlLinkage: true,
@@ -115,7 +123,7 @@ const model = defineModel<KV<number>[]>({ default: [] });
 const gameId = defineModel<number>("gameId", { required: false });
 const isGameLoading = ref(false);
 const isServerLoading = ref(false);
-const types = ref<string[]>([]);
+const types = ref<NodeType[]>([]);
 const games = ref<GamePicker.TreeNodeVO[]>([]);
 const nodes = ref<GamePicker.TreeNodeVO[]>([]);
 const servers = ref<GamePicker.TreeNodeVO[]>([]);
@@ -126,7 +134,7 @@ const selected = ref<GamePicker.SimpleOptionVM[]>([]);
 /**
  * 当前选中的类型
  */
-const currentType = ref<string>("");
+const currentType = ref<Partial<NodeType>>();
 /**
  * 节点类型白名单
  */
@@ -214,7 +222,7 @@ watch(
     const _valList = val.map(m => ({ key: m.key, value: Number(m.value) }));
     const _oldList = old?.map(m => ({ key: m.key, value: Number(m.value) }));
     if (JSON.stringify(_valList) !== JSON.stringify(_oldList)) {
-      _log("model change", _valList, _oldList);
+      GamePickers.log("model change", _valList, _oldList);
       setDefaultValue(val);
       emit("change", _unReactive(val), _unReactive(old), selectedServer.value);
     }
@@ -228,7 +236,7 @@ watch(
  * 选择器表单控件点击事件
  * @param type 数据项类型
  */
-const handleInputClick = (type: string) => {
+const handleInputClick = (type: NodeType) => {
   if (disabled.value) {
     return;
   }
@@ -282,15 +290,15 @@ const handlePanelClose = () => {
  * 设置默认值，从 URL 参数中获取
  */
 async function setDefaultValueWithQuery() {
-  _log("设置默认值从 URL 参数，开始");
+  GamePickers.log("设置默认值从 URL 参数，开始");
   const { kv } = parseUrlParams(window.location.href);
   // 如果 kv 长度大于 0，且 kv 中的 key 在 whiteList 中，则设置默认值
   if (kv.length > 0 && kv.some(m => whiteList.includes(m.key as NodeType))) {
-    _log("设置默认值从 URL 参数，结束，找到可用的 URL 参数", kv);
+    GamePickers.log("设置默认值从 URL 参数，结束，找到可用的 URL 参数", kv);
     await setDefaultValue(kv);
   }
   else {
-    _log("设置默认值从 URL 参数，结束，没有找到可用的 URL 参数");
+    GamePickers.log("设置默认值从 URL 参数，结束，没有找到可用的 URL 参数");
   }
 }
 
@@ -345,9 +353,9 @@ function parseUrlParams(url: string): UrlParseResult {
  * eg: [{key:'game',value:10},{key:'region',value:112},{key:'server',value:10}]
  */
 async function setDefaultValue(params?: KV<number>[]) {
-  _log("设置默认值 start", JSON.stringify(params));
+  GamePickers.log("设置默认值 start", JSON.stringify(params));
   if (!params || params.length === 0) {
-    _log("设置默认值 params 为空");
+    GamePickers.log("设置默认值 params 为空");
     _resetState();
     return;
   }
@@ -393,11 +401,11 @@ async function setDefaultValue(params?: KV<number>[]) {
 
   // 先按 types 排序，再按 whiteList 过滤并排序参数
   params = params
-    .filter(m => types.value.includes(m.key))
+    .filter(m => types.value.includes(m.key as NodeType))
     .filter(m => whiteList.includes(m.key as NodeType))
     .sort((a, b) => whiteList.indexOf(a.key as NodeType) - whiteList.indexOf(b.key as NodeType)) as KV<number>[];
 
-  _log("对 params 进行过滤和排序", params.map(m => `${m.key}:${m.value}`).join(','));
+  GamePickers.log("对 params 进行过滤和排序", params.map(m => `${m.key}:${m.value}`).join(','));
 
 
   // case 1.3 & 2.3: 循环遍历传入的参数,设置默认值
@@ -411,7 +419,7 @@ async function setDefaultValue(params?: KV<number>[]) {
       // 否则跳过本次设置默认值
       continue;
     }
-    _log("循环遍历传入的参数,设置默认值", param.key, param.value);
+    GamePickers.log("循环遍历传入的参数,设置默认值", param.key, param.value);
     selectedItem(param.key, {
       typeName: "",
       options: [],
@@ -422,7 +430,7 @@ async function setDefaultValue(params?: KV<number>[]) {
       initial: node.initial,
     });
   }
-  _log("设置默认值 finish");
+  GamePickers.log("设置默认值 finish");
 }
 
 /**
@@ -431,7 +439,7 @@ async function setDefaultValue(params?: KV<number>[]) {
  */
 function attemptAddType(params: KV<number>[]) {
   if (types.value.length === 0 || params.every(m => m.key !== "unknown")) {
-    _log("attemptAddType 忽略", JSON.stringify(params));
+    GamePickers.log("attemptAddType 忽略", JSON.stringify(params));
   }
   else {
     for (let i = 0; i < params.length; i++) {
@@ -449,18 +457,18 @@ function attemptAddType(params: KV<number>[]) {
  */
 function moveToNextType() {
   const index = types.value.findIndex((m) => m == currentType.value);
-  _log(
+  GamePickers.log(
     "moveToNextType",
     currentType.value,
     index,
     types.value.length
   );
   if (index + 1 >= types.value.length) {
-    _log("已经是最后一个类型了");
-    _setCurrentType("");
+    GamePickers.log("已经是最后一个类型了");
+    _setCurrentType(undefined);
   } else {
     const nextType = types.value[index + 1];
-    _log("nextType", nextType);
+    GamePickers.log("nextType", nextType);
     _setCurrentType(nextType);
   }
 }
@@ -519,11 +527,11 @@ function selectedItem(type: string, item: GamePicker.OptionVM) {
  */
 function clean(type: "game" | "server") {
   if (type == "game") {
-    _log("clean game");
+    GamePickers.log("clean game");
     games.value.length = 0;
   }
   if (type == "server") {
-    _log("clean server");
+    GamePickers.log("clean server");
     servers.value.length = 0;
   }
 }
@@ -532,7 +540,7 @@ function clean(type: "game" | "server") {
  * 设置当前选项类型
  * @param type 选项类型
  */
-function _setCurrentType(type: string) {
+function _setCurrentType(type: NodeType | undefined) {
   currentType.value = type;
 }
 
@@ -540,7 +548,7 @@ function _setCurrentType(type: string) {
  * 关闭面板
  */
 function closePanel() {
-  _setCurrentType("");
+  _setCurrentType(undefined);
 }
 
 /**
@@ -549,6 +557,7 @@ function closePanel() {
 function _resetState() {
   selected.value = [];
   gameId.value = undefined;
+  types.value = ['game'];
   Urls.removeParam("game");
   Urls.removeParam("region");
   Urls.removeParam("server");
@@ -590,7 +599,7 @@ async function loadGames(loadSuccess?: GamePicker.LoadSuccessFn) {
     }
   }
   isGameLoading.value = false;
-  _log("loadGames finish");
+  GamePickers.log("loadGames finish");
 }
 
 /**
@@ -602,14 +611,14 @@ async function loadServers(
   gameId: number,
   loadSuccess?: GamePicker.LoadSuccessFn
 ) {
-  _log("loadServers start", gameId);
+  GamePickers.log("loadServers start", gameId);
   isServerLoading.value = true;
   const { data, error } = await listServerAsTreeByGameId(gameId);
   if (error) {
     alert("加载游戏服务器数据失败");
     return;
   }
-  _log("loadServers finish");
+  GamePickers.log("loadServers finish");
   const list = Trees.flatten(data as any) as GamePicker.TreeNodeVO[];
   types.value = ["game", ..._extractUniqueTypes(list as any)];
   const formated = _formatDate(list, "server");
@@ -647,27 +656,26 @@ function _formatDate(nodes: GamePicker.TreeNodeVO[], type: string): GamePicker.T
   }
 }
 
-function _extractUniqueTypes(data: GamePicker.TreeNodeVO[]): string[] {
-  return [...new Set(data.map((item) => item.type))];
-}
-
-function _unReactive(val: any) {
-  if (val === undefined || val === null) {
-    _log("_unReactive val is empty");
-    return val;
-  }
-  return JSON.parse(JSON.stringify(val));
+/**
+ * 提取唯一类型数组
+ * @param data 节点数据
+ * @returns 唯一类型数组, eg: ['game', 'region', 'server']
+ */
+function _extractUniqueTypes(data: GamePicker.TreeNodeVO[]): NodeType[] {
+  return [...new Set(data.map((item) => item.type as NodeType))];
 }
 
 /**
- * 打印日志
- * @param args 日志内容
+ * 将值转换为非响应式
+ * @param val 值，undefined 或 null 返回原值
+ * @returns 非响应式值
  */
-function _log(...args: any[]) {
-  const fixedPrefix = [`🎉%cGamePicker%c`,
-    "color: black; border-radius: 3px 0 0 3px; padding: 2px 2px 1px 10px; background: #00DC82",
-    "border-radius: 0 3px 3px 0; padding: 2px 10px 1px 2px; background: #00DC8220"];
-  console.info(...[...fixedPrefix, ...args], dayjs().format("YYYY-MM-DD HH:mm:ss.SSS"));
+function _unReactive(val: any) {
+  if (val === undefined || val === null) {
+    GamePickers.log("_unReactive val is empty");
+    return val;
+  }
+  return JSON.parse(JSON.stringify(val));
 }
 
 /**
@@ -684,7 +692,7 @@ async function loadRemoteData(game?: number) {
 }
 
 onMounted(async () => {
-  _log("onMounted");
+  GamePickers.log("onMounted");
 
   // 1.尝试解析 URL 参数，如果有 game 参数，则加载服务器数据时，使用 game 参数，否则直接加载远程数据
   const { route } = parseUrlParams(window.location.href);
