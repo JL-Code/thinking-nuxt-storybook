@@ -7,7 +7,7 @@
           <div>model:{{ value }}</div>
         </div>
         <div class="w-100 flex flex-col gap-2">
-          <GamePicker v-model="value" debug @change="onChange" />
+          <GamePicker v-model="value" size="small" debug @change="onChange" />
         </div>
         <div class="mt-2 flex flex-wrap gap-2">
           <ElButton @click="navigateTo('/')">返回首页</ElButton>

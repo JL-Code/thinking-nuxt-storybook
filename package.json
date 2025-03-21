@@ -18,7 +18,7 @@
     "element-plus": ">=2",
     "fuse.js": "^7.1.0",
     "lodash": "^4.17.21",
-    "nuxt": "^3.15.4",
+    "nuxt": "3.15.4",
     "vue": "latest"
   },
   "devDependencies": {
