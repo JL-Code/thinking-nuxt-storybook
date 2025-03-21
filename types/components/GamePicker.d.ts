@@ -92,5 +92,5 @@ declare namespace GamePicker {
   /**
    * 加载成功回调函数类型
    */
-  type LoadSuccessFn = (data: any[]) => void;
+  type LoadSuccessFn<T1 = any, T2 = any> = (data: T1[], payload?: T2) => void;
 }

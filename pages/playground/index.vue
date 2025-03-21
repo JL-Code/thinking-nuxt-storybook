@@ -10,7 +10,7 @@
           <GamePicker v-model="value" debug @change="onChange" />
         </div>
         <div class="mt-2 flex flex-wrap gap-2">
-          <NuxtLink to="/">返回首页</NuxtLink>
+          <ElButton @click="navigateTo('/')">返回首页</ElButton>
           <ElButton @click="resetState">重置选择器</ElButton>
         </div>
 
@@ -38,32 +38,20 @@ const gameId = ref<number>(332);
 // 24201 23966-24008
 const serverIndex = ref<string>("23966-24008");
 const serverIndexs = ref<string[]>(["24201", "23966-24008"]);
-const value = ref<KV<number>[]>([
-  {
-    key: "game",
-    value: 332,
-  },
-  {
-    key: "region",
-    value: 23967,
-  },
-  {
-    key: "server",
-    value: 24103,
-  },
-]);
+const value = ref<KV<number>[]>([]);
+
 const resetState = () => {
   value.value = [];
 };
 
 watch(value, (val, oldVal) => {
   if (JSON.stringify(val) !== JSON.stringify(oldVal)) {
-    console.warn("[playground] model value", JSON.stringify(val), JSON.stringify(oldVal));
+    console.debug("[playground] model value");
   }
 });
 
 const onChange = (val: KV<number>[], oldVal?: KV<number>[]) => {
-  console.warn("[playground] onChange", JSON.stringify(val), JSON.stringify(oldVal));
+  console.debug("[playground] onChange");
 }
 
 /**
@@ -79,10 +67,29 @@ function setGameIdAndServerIndex(gameId: number, serverIndex: string) {
   });
   serverIndex.split("-").forEach((s) => {
     params.push({
-      key: "unknown", // FIXME: 委托给 GamePicker 根据游戏处理
+      key: "unknown",
       value: Number(s),
     });
   });
   value.value = params;
 }
+
+// onMounted(() => {
+//   setTimeout(() => {
+//     value.value = [
+//       {
+//         key: "game",
+//         value: 332,
+//       },
+//       {
+//         key: "region",
+//         value: 23967,
+//       },
+//       {
+//         key: "server",
+//         value: 24103,
+//       },
+//     ];
+//   }, 1000);
+// });
 </script>

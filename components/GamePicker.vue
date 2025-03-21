@@ -26,7 +26,7 @@
     <div class="flex w-full gap-x-2">
       <template v-if="steps.length">
         <div v-for="item in steps" class="w-full" :key="item.type">
-          <el-input :key="item.type" :placeholder="`请选择${item.typeName}`"
+          <el-input :disabled="disabled" :key="item.type" :placeholder="`请选择${item.typeName}`"
             @click="handleInputClick(item.type as NodeType)" class="game-picker-input" readonly
             :model-value="item.label">
             <template #suffix>
@@ -58,6 +58,7 @@
   </div>
   <!-- 游戏选择器组件E -->
 </template>
+
 <script setup lang="ts">
 // ssr 时数据由调用者传入
 // 非 ssr 时数据由组件内部调用
@@ -78,6 +79,11 @@ interface Props {
    * 调试模式
    */
   debug?: boolean;
+  /**
+   * 是否立即选中，默认 true，将选中第一个游戏及其第一个服务器。
+   * 
+   */
+  immediateSelect?: boolean;
   /**
    * URL参数联动
    */
@@ -112,8 +118,18 @@ interface PickerRoute {
  * 解析 URL 参数
  */
 interface UrlParseResult {
+  /**
+   * 解析后的 URL 参数
+   */
   route: Partial<PickerRoute>;
-  kv: KV<number>[];
+  /**
+   * 解析后的 URL 参数, 键值对格式
+   */
+  kv: KV<number, NodeType>[];
+  /**
+   * 有效的 URL 参数
+   */
+  isValid: boolean;
 }
 /**
  * 节点类型
@@ -123,9 +139,11 @@ type NodeType = keyof PickerRoute;
 const props = withDefaults(defineProps<Props>(), {
   mock: false,
   debug: false,
+  immediateSelect: true,
   urlLinkage: true,
   data: () => []
 });
+
 const emit = defineEmits<{
   change: [val: KV<number>[], old?: KV<number>[], server?: string];
   itemClick: [type: string, item: any];
@@ -139,6 +157,7 @@ const model = defineModel<KV<number>[]>({ default: [] });
 const gameId = defineModel<number>("gameId", { required: false });
 const isGameLoading = ref(false);
 const isServerLoading = ref(false);
+
 const types = ref<NodeType[]>([]);
 const games = ref<GamePicker.TreeNodeVO[]>([]);
 const nodes = ref<GamePicker.TreeNodeVO[]>([]);
@@ -239,7 +258,7 @@ watch(
     const _valList = val.map(m => ({ key: m.key, value: Number(m.value) }));
     const _oldList = old?.map(m => ({ key: m.key, value: Number(m.value) }));
     if (JSON.stringify(_valList) !== JSON.stringify(_oldList)) {
-      GamePickers.log("model change", _valList, _oldList);
+      GamePickers.log("设置默认值 watch model change 调用方法", JSON.stringify(_valList), JSON.stringify(_oldList));
       setDefaultValue(val);
       emit("change", _unReactive(val), _unReactive(old), selectedServer.value);
     }
@@ -257,7 +276,6 @@ const handleInputClick = (type: NodeType) => {
   if (disabled.value) {
     return;
   }
-  console.debug("[game-picker] 选中", type);
   _setCurrentType(type);
   panelRef.value?.resetLetter();
 };
@@ -308,12 +326,26 @@ const handlePanelClose = () => {
  * 设置默认值，从 URL 参数中获取
  */
 async function setDefaultValueWithQuery() {
+  // 当前 model 与 url 参数一致时，不设置默认值
+
+  const { kv, isValid } = _parseUrlParams(window.location.href);
+  if (!isValid) {
+    GamePickers.log("设置默认值从 URL 参数，结束，URL 参数无效");
+    return;
+  }
+  const _model = model.value.map(m => ({ key: m.key, value: Number(m.value) }));
+  if (JSON.stringify(_model) === JSON.stringify(kv)) {
+    GamePickers.log("设置默认值从 URL 参数，结束，URL 参数与 model 一致");
+    return;
+  }
+
   GamePickers.log("设置默认值从 URL 参数，开始");
-  const { kv } = parseUrlParams(window.location.href);
   // 如果 kv 长度大于 0，且 kv 中的 key 在 whiteList 中，则设置默认值
   if (kv.length > 0 && kv.some(m => whiteList.includes(m.key as NodeType))) {
     GamePickers.log("设置默认值从 URL 参数，结束，找到可用的 URL 参数", kv);
-    await setDefaultValue(kv);
+    // 直接给 model 赋值，是否可以避免 watch  model 的触发
+    GamePickers.log("设置默认值从 URL 参数，直接给 model 赋值", JSON.stringify(kv));
+    model.value = kv;
   }
   else {
     GamePickers.log("设置默认值从 URL 参数，结束，没有找到可用的 URL 参数");
@@ -325,10 +357,10 @@ async function setDefaultValueWithQuery() {
  * @param url url参数，eg: http://localhost:8080?game=10&region=112&server=10
  * @returns {route: Partial<PickerRoute>, kv: KV<number>[]}
  */
-function parseUrlParams(url: string): UrlParseResult {
+function _parseUrlParams(url: string): UrlParseResult {
   const params = Urls.readParams(url);
-  const kv: KV<number>[] = Array.from(params.entries()).map(([key, value]) => ({
-    key,
+  const kv: KV<number, NodeType>[] = Array.from(params.entries()).map(([key, value]) => ({
+    key: key as NodeType,
     value: Number(value),
   }));
 
@@ -341,7 +373,8 @@ function parseUrlParams(url: string): UrlParseResult {
 
   return {
     route,
-    kv
+    kv,
+    isValid: route.game !== undefined
   };
 }
 
@@ -373,7 +406,7 @@ function parseUrlParams(url: string): UrlParseResult {
 async function setDefaultValue(params?: KV<number>[]) {
   GamePickers.log("设置默认值 start", JSON.stringify(params));
   if (!params || params.length === 0) {
-    GamePickers.log("设置默认值 params 为空");
+    GamePickers.log("设置默认值 params 为空，重置组件状态");
     _resetState();
     return;
   }
@@ -399,7 +432,7 @@ async function setDefaultValue(params?: KV<number>[]) {
     let _gameNode = games.value.find(m => m.id === _gameId);
     if (!_gameNode) {
       // case 2.1.1: 游戏节点不存在,加载游戏数据
-      await loadRemoteData(_gameId);
+      loadRemoteData(_gameId);
       _gameNode = games.value.find(m => m.id === _gameId);
       if (!_gameNode) {
         // case 2.1.1.2: 游戏节点不存在,提示游戏不存在
@@ -437,7 +470,7 @@ async function setDefaultValue(params?: KV<number>[]) {
       // 否则跳过本次设置默认值
       continue;
     }
-    GamePickers.log("循环遍历传入的参数,设置默认值", param.key, param.value);
+    // GamePickers.log("循环遍历传入的参数,设置默认值", param.key, param.value);
     selectedItem(param.key, {
       typeName: "",
       options: [],
@@ -628,33 +661,46 @@ async function loadGames(loadSuccess?: GamePicker.LoadSuccessFn) {
  */
 async function loadServers(
   gameId: number,
-  loadSuccess?: GamePicker.LoadSuccessFn
+  loadSuccess?: GamePicker.LoadSuccessFn<GamePicker.TreeNodeVO, KV<number, NodeType>[]>
 ) {
   GamePickers.log("loadServers start", gameId);
   isServerLoading.value = true;
   const { data, error } = await listServerAsTreeByGameId(gameId, props.mock);
-  if (error) {
+  if (error || !data) {
     alert("加载游戏服务器数据失败");
     return;
   }
-  GamePickers.log("loadServers finish");
+  // 获取第一个节点及其所有的子孙节点数据
+  const serverIndexs: KV<number, NodeType>[] = [];
+  // TODO: 需要保证节点数组的顺序
+  const descendants = getFirstDescendantNodes([data[0]]);
+  descendants.map(m => {
+    serverIndexs.push({
+      key: m.type as NodeType,
+      value: m.id,
+      label: m.name,
+    });
+  });
+
   const list = Trees.flatten(data as any) as GamePicker.TreeNodeVO[];
   types.value = ["game", ..._extractUniqueTypes(list as any)];
   const formated = _formatDate(list, "server");
   nodes.value = [..._unReactive(games.value), ...formated];
   servers.value = [...formated];
   if (loadSuccess) {
-    loadSuccess(formated);
+    loadSuccess(formated, serverIndexs);
   }
   isServerLoading.value = false;
+  GamePickers.log("loadServers finish");
 }
+
 
 
 /**
  * 格式化数据
  * @param nodes 节点数据
  */
-function _formatDate(nodes: GamePicker.TreeNodeVO[], type: string): GamePicker.TreeNodeVO[] {
+function _formatDate(nodes: GamePicker.TreeNodeVO[], type: NodeType): GamePicker.TreeNodeVO[] {
   const formated = nodes.map((n) => {
     return {
       id: n.id!,
@@ -698,25 +744,42 @@ function _unReactive(val: any) {
 }
 
 /**
+ * 是否首次加载
+ */
+const firstLoaded = ref(true);
+
+/**
  * 加载远程数据
  * @param game 游戏id
+ * @param isValid 是否有效的 URL 参数
  */
-async function loadRemoteData(game?: number) {
+async function loadRemoteData(game?: number, isValid?: boolean) {
   if (isGameLoading.value || isServerLoading.value) {
     return;
   }
   await loadGames();
   const firstGame = games.value[0];
-  await loadServers(game || firstGame.id);
+  await loadServers(game || firstGame.id, (_data, _indexs) => {
+    // 首次加载时如果 immediateSelect 为 true，并且 URL 参数无效，则设置默认值
+    if (props.immediateSelect && firstLoaded.value && !isValid) {
+      GamePickers.log("首次加载并且设置了 immediateSelect 为 true", _indexs);
+      firstLoaded.value = false;
+      // 直接给 model 赋值，是否可以避免 watch model 的触发
+      model.value = [{ key: "game", value: firstGame.id, label: firstGame.name }, ...(_indexs || [])];
+    }
+    else {
+      GamePickers.log("设置默认值 不满足条件 期望 immediateSelect 为 true 且 firstLoaded 为 true 且 isValid 为 false 实际 immediateSelect:", props.immediateSelect, "firstLoaded:", firstLoaded.value, "isValid:", isValid);
+    }
+  });
 }
 
 onMounted(async () => {
   GamePickers.log("onMounted");
 
   // 1.尝试解析 URL 参数，如果有 game 参数，则加载服务器数据时，使用 game 参数，否则直接加载远程数据
-  const { route } = parseUrlParams(window.location.href);
+  const { route, isValid } = _parseUrlParams(window.location.href);
   if (props.data.length === 0) {
-    await loadRemoteData(route.game);
+    await loadRemoteData(route.game, isValid);
   }
   await setDefaultValueWithQuery();
 });
@@ -726,6 +789,25 @@ onMounted(async () => {
 defineExpose({
   setDefaultValue,
 });
+
+/**
+ * 获取指定节点的所有子孙节点中第一个子节点
+ * @param nodes 节点数据
+ * @returns 所有子孙节点中第一个子节点
+ */
+function getFirstDescendantNodes(nodes: GamePicker.TreeNodeVO[]): GamePicker.TreeNodeVO[] {
+  const resultNodes: GamePicker.TreeNodeVO[] = [];
+
+  function traverse(node: GamePicker.TreeNodeVO) {
+    resultNodes.push(node); // 添加当前节点
+    if (node.children && node.children.length > 0) {
+      traverse(node.children[0]); // 递归遍历第一个子节点
+    }
+  }
+
+  nodes.forEach(node => traverse(node));
+  return resultNodes;
+}
 </script>
 
 <style lang="scss" scoped>

@@ -1,8 +1,9 @@
-interface KV<V> {
-  key: string;
+interface KV<V = any, K = string> {
+  key: K;
   value: V;
   label?: string;
 }
+
 /**
  * 任意的对象类型 key 为 string，value 可为任意类型
  */
