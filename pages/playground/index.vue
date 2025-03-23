@@ -18,13 +18,25 @@
           <h1>手动设置选中值</h1>
           游戏id：
           <ElSelect v-model="gameId" placeholder="请选择游戏">
-            <ElOption v-for="item in gameIds" :key="item" :label="item" :value="item" />
+            <ElOption
+              v-for="item in gameIds"
+              :key="item"
+              :label="item"
+              :value="item"
+            />
           </ElSelect>
           服务器索引：
           <ElSelect v-model="serverIndex" placeholder="请选择服务器">
-            <ElOption v-for="item in serverIndexs" :key="item" :label="item" :value="item" />
+            <ElOption
+              v-for="item in serverIndexs"
+              :key="item"
+              :label="item"
+              :value="item"
+            />
           </ElSelect>
-          <ElButton @click="setGameIdAndServerIndex(gameId, serverIndex)">设置选中值</ElButton>
+          <ElButton @click="setGameIdAndServerIndex(gameId, serverIndex)"
+            >设置选中值</ElButton
+          >
         </div>
       </UCard>
     </UContainer>
@@ -32,12 +44,21 @@
 </template>
 
 <script setup lang="ts">
+// {
+//   label: "无尽冬日/金币",
+//   to: "/playground",
+//   query: {
+//     game: 342,
+//     region: 24247,
+//     camp: 24256,
+//   },
+// },
 // 334 332
-const gameIds = ref<number[]>([334, 332]);
+const gameIds = ref<number[]>([334, 332, 342]);
 const gameId = ref<number>(332);
 // 24201 23966-24008
 const serverIndex = ref<string>("23966-24008");
-const serverIndexs = ref<string[]>(["24201", "23966-24008"]);
+const serverIndexs = ref<string[]>(["24201", "23966-24008", "24247-24256"]);
 const value = ref<KV<number>[]>([]);
 
 const resetState = () => {
@@ -52,7 +73,7 @@ watch(value, (val, oldVal) => {
 
 const onChange = (val: KV<number>[], oldVal?: KV<number>[]) => {
   console.debug("[playground] onChange");
-}
+};
 
 /**
  *
