@@ -6,18 +6,11 @@
           <div class="flex justify-between">
             <h1>Welcome to Nuxt UI Starter</h1>
             <ColorScheme>
-              <USelect
-                v-model="$colorMode.preference"
-                :options="['system', 'light', 'dark']"
-              />
+              <USelect v-model="$colorMode.preference" :options="['system', 'light', 'dark']" />
             </ColorScheme>
           </div>
         </template>
-        <UButton
-          icon="i-heroicons-book-open"
-          to="https://ui.nuxt.com"
-          target="_blank"
-          >Open Nuxt UI Documentation
+        <UButton icon="i-heroicons-book-open" to="https://ui.nuxt.com" target="_blank">Open Nuxt UI Documentation
         </UButton>
 
         <Button label="Custom Button" size="large" type="success" />
@@ -26,16 +19,14 @@
 
         <!-- playground -->
         <div class="mt-2 flex flex-wrap gap-2">
-          <NuxtLink
-            class="mt-2 hover:underline"
-            v-for="item in links"
-            :key="item.to"
-            :to="{
-              path: item.to,
-              query: item.query,
-            }"
-            >{{ item.label }}</NuxtLink
-          >
+          <NuxtLink class="mt-2 hover:underline" v-for="item in links" :key="item.to" :to="{
+            path: item.to,
+            query: item.query,
+          }">{{ item.label }}</NuxtLink>
+        </div>
+        <div>
+          <p>{{ getCookie() }}</p>
+          <UButton @click="setCookie">set token</UButton>
         </div>
       </UCard>
     </UContainer>
@@ -73,22 +64,5 @@ const links = ref([
 ]);
 const value = ref<KV<number>[]>([]);
 
-onMounted(() => {
-  // setTimeout(() => {
-  //   value.value = [
-  //     {
-  //       key: "game",
-  //       value: 332,
-  //     },
-  //     {
-  //       key: "region",
-  //       value: 23967,
-  //     },
-  //     {
-  //       key: "server",
-  //       value: 24103,
-  //     },
-  //   ];
-  // }, 1000);
-});
+const { setCookie, getCookie } = useTokenCookie();
 </script>
